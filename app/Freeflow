@@ -1,0 +1,13 @@
+#!/bin/bash
+# Freeflow launcher — finds the venv and runs the app
+FREEFLOW_HOME="$HOME/.config/freeflow"
+VENV="$FREEFLOW_HOME/venv"
+
+if [ ! -d "$VENV" ]; then
+    # First run: create venv and install deps
+    osascript -e 'display notification "Setting up Freeflow (one time, ~2 min)..." with title "Freeflow"'
+    python3 -m venv "$VENV"
+    "$VENV/bin/pip" install -q moondream pynput sounddevice pyobjc-framework-Cocoa pyobjc-framework-Quartz rumps
+fi
+
+exec "$VENV/bin/python" -m freeflow.main
