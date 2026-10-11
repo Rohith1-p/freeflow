@@ -12,20 +12,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
-        let policyOK = NSApp.setActivationPolicy(.accessory)  // menu bar only
-        NSLog("[Freeflow] launch: policy set ok=\(policyOK) current=\(NSApp.activationPolicy().rawValue)")
+        NSApp.setActivationPolicy(.regular)  // Dock icon + menu bar icon
         AppTheme(rawValue: Store.shared.settings.theme)?.apply()
         installStatusItem()
-        NSLog("[Freeflow] status item installed: \(statusItem != nil), button=\(statusItem?.button != nil)")
         state.startEngine()
-        NSLog("[Freeflow] hotkey active: \(state.hotkeyActive)")
 
         // Warm the model in the background after launch
         Task { await state.transcriber.prepare() }
 
-        if !Store.shared.settings.completedOnboarding {
-            showMainWindow()
-        }
+        // Always show the main window on launch — users expect to see the app
+        showMainWindow()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -79,7 +75,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Recording")
                     button.contentTintColor = .systemRed
                 } else {
-                    button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Freeflow")
+                    if let wave = MenuIcon.wave() {
+                        button.image = wave
+                    } else {
+                        button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Freeflow")
+                    }
                     button.contentTintColor = nil
                 }
             }
@@ -91,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func showMainWindow() {
         if mainWindow == nil {
-            let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 520),
+            let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
                                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                                backing: .buffered, defer: false)
             win.title = "Freeflow"
@@ -99,9 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             win.titlebarSeparatorStyle = .none
             win.backgroundColor = .clear
             win.isMovableByWindowBackground = true
-            win.contentView = NSHostingView(rootView: RootView(state: state, onOpenSettings: { [weak self] in
-                self?.showSettings()
-            }))
+            win.contentView = NSHostingView(rootView: RootView(state: state))
             win.center()
             win.delegate = self
             win.isReleasedWhenClosed = false
@@ -111,23 +109,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Settings now live INSIDE the main window (sidebar navigation).
     @objc func showSettings() {
-        if settingsWindow == nil {
-            let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 400),
-                               styleMask: [.titled, .closable, .fullSizeContentView],
-                               backing: .buffered, defer: false)
-            win.title = "Freeflow Settings"
-            win.titlebarAppearsTransparent = true
-            win.titlebarSeparatorStyle = .none
-            win.backgroundColor = .clear
-            win.contentView = NSHostingView(rootView: SettingsView(state: state)
-                .padding(.top, 28))
-            win.center()
-            win.isReleasedWhenClosed = false
-            settingsWindow = win
-        }
-        settingsWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        UIRouter.shared.page = .settings
+        showMainWindow()
     }
 
     @objc func quit() {

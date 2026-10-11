@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import AVFoundation
+import AVFAudio
 import ApplicationServices
 
 /// Freeflow brand palette: blue + black.
@@ -64,7 +65,7 @@ struct OnboardingView: View {
             content
         }
         .frame(width: 740, height: 500)
-        .background(.ultraThinMaterial)
+        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { pollPermissions() }
         .onDisappear {
             micTimer?.invalidate(); axTimer?.invalidate()
@@ -77,12 +78,7 @@ struct OnboardingView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                ZStack {
-                    Circle().fill(Brand.inkDark).frame(width: 34, height: 34)
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.white)
-                }
+                AppIconMark(size: 32)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Freeflow").font(.system(size: 15, weight: .bold, design: .rounded))
                     Text("First-time setup").font(.system(size: 11)).foregroundStyle(.secondary)
@@ -109,8 +105,7 @@ struct OnboardingView: View {
         }
         .padding(16)
         .frame(width: 212)
-        .glassSidebar()
-    }
+            }
 
     private func stepRow(_ s: Step) -> some View {
         let isDone = (s == .permissions && micGranted && axGranted)
@@ -167,7 +162,7 @@ struct OnboardingView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(cornerRadius: 9)
+        .chipSurface(cornerRadius: 9)
     }
 
     // MARK: - Content
@@ -289,9 +284,12 @@ struct OnboardingView: View {
             permissionCard(
                 icon: "mic.fill", tag: "Required",
                 title: "Hear you while you dictate",
-                detail: "Freeflow listens only while you hold your dictation key.",
+                detail: micDenied
+                    ? "Microphone access was denied. Enable it in System Settings, then come back."
+                    : "Freeflow listens only while you hold your dictation key.",
                 granted: micGranted,
-                action: "Request Access", actionFn: requestMic
+                action: micDenied ? "Open Microphone Settings" : "Request Access",
+                actionFn: micDenied ? openMicSettings : requestMic
             )
             permissionCard(
                 icon: "keyboard", tag: "Required",
@@ -361,7 +359,7 @@ struct OnboardingView: View {
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassCard(cornerRadius: 12)
+            .card(cornerRadius: 12)
 
             Text("You can keep going through setup while it downloads.")
                 .font(.system(size: 11)).foregroundStyle(.tertiary)
@@ -417,7 +415,7 @@ struct OnboardingView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
             }
-            .glassCard(cornerRadius: 14)
+            .card(cornerRadius: 14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(state.keyIsDown ? Brand.blue : Color.clear, lineWidth: 2)
@@ -541,7 +539,7 @@ struct OnboardingView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .glassCard(cornerRadius: 11)
+        .card(cornerRadius: 11)
     }
 
     private func summaryChip(icon: String, title: String, value: String) -> some View {
@@ -555,7 +553,7 @@ struct OnboardingView: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, 12).padding(.vertical, 9)
-        .glassCard(cornerRadius: 10)
+        .chipSurface(cornerRadius: 10)
     }
 
     private func permissionCard(icon: String, tag: String, title: String, detail: String,
@@ -596,7 +594,7 @@ struct OnboardingView: View {
             }
         }
         .padding(12)
-        .glassCard(cornerRadius: 10)
+        .chipSurface(cornerRadius: 10)
     }
 
     private var keyStatusBadge: some View {
@@ -665,10 +663,29 @@ struct OnboardingView: View {
         }
     }
 
+    private var micDenied: Bool {
+        AVCaptureDevice.authorizationStatus(for: .audio) == .denied
+    }
+
+    private func openMicSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     private func requestMic() {
-        AVCaptureDevice.requestAccess(for: .audio) { _ in
-            DispatchQueue.main.async {
-                micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        // Modern API (macOS 14+); falls back to the legacy call.
+        if #available(macOS 14.0, *) {
+            AVAudioApplication.requestRecordPermission { _ in
+                DispatchQueue.main.async {
+                    micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                }
+            }
+        } else {
+            AVCaptureDevice.requestAccess(for: .audio) { _ in
+                DispatchQueue.main.async {
+                    micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                }
             }
         }
     }

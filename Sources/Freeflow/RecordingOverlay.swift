@@ -16,9 +16,10 @@ final class RecordingOverlay {
 
     func updateLevel(_ rms: Float) {
         DispatchQueue.main.async { [self] in
-            // Only when visible; cheap no-op otherwise
+            // Only when visible; cheap no-op otherwise.
+            // Gain: raw speech RMS is ~0.01-0.15; scale into a lively 0...1 range.
             guard panel?.isVisible == true else { return }
-            update { $0.micLevel = Double(rms) }
+            update { $0.micLevel = Double(min(1.0, Double(rms) * 9.0)) }
         }
     }
 
@@ -40,7 +41,7 @@ final class RecordingOverlay {
         let view = OverlayView()
         let hosting = NSHostingView(rootView: view)
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 250, height: 54),
+            contentRect: NSRect(x: 0, y: 0, width: 300, height: 70),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered, defer: false
         )
@@ -53,8 +54,8 @@ final class RecordingOverlay {
         panel.contentView = hosting
         // Position: bottom-center of the main display
         if let screen = NSScreen.main {
-            let midX = screen.frame.midX - 125
-            panel.setFrameOrigin(NSPoint(x: midX, y: screen.frame.minY + 96))
+            let midX = screen.frame.midX - 150
+            panel.setFrameOrigin(NSPoint(x: midX, y: screen.frame.minY + 100))
         }
         self.panel = panel
     }
@@ -64,65 +65,68 @@ final class RecordingOverlay {
 struct OverlayView: View {
     enum Phase { case listening, transcribing }
     var phase: OverlayView.Phase = .listening
-    @State var micLevel: Double = 0
+    // Plain var (NOT @State): we drive it from outside via rootView updates.
+    // @State ignores externally injected values after first render — that
+    // froze the level bars at their idle height.
+    var micLevel: Double = 0
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
             switch phase {
             case .listening:
                 Image(systemName: "mic.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
                 LevelBars(level: micLevel)
-                    .frame(width: 42)
+                    .frame(width: 46)
                 Text("Listening…")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .fixedSize()
             case .transcribing:
                 ProgressView()
-                    .controlSize(.small)
+                    .controlSize(.regular)
                     .tint(.white)
                 Text("Transcribing…")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .fixedSize()
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .glassCapsule()
+        .padding(.horizontal, 22)
+        .padding(.vertical, 16)
         .background(
-            // Dark tint behind the glass keeps white text readable over any app
-            Capsule().fill(Color.black.opacity(0.35))
+            Capsule().fill(Brand.inkDark.opacity(0.96))
+                .shadow(color: .black.opacity(0.28), radius: 16, y: 6)
         )
-        .shadow(color: .black.opacity(0.22), radius: 16, y: 6)
         .overlay(
-            Capsule().stroke(Brand.blue.opacity(0.5), lineWidth: 1)
+            Capsule().strokeBorder(Brand.blue.opacity(0.45), lineWidth: 1)
         )
     }
 }
 
 /// Animated level bars driven by live mic RMS.
 struct LevelBars: View {
-    var level: Double  // 0...1 raw RMS (typically 0...0.3)
-    @State private var tick = 0
-
-    private var normalized: Double {
-        min(1, max(0.06, Double(level) * 6))
-    }
+    var level: Double  // 0...1, already gain-adjusted
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.05)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
-            HStack(spacing: 3) {
+            HStack(alignment: .center, spacing: 3) {
                 ForEach(0..<4, id: \.self) { i in
-                    let wobble = 0.55 + 0.45 * sin(t * (6.0 + Double(i) * 1.7) + Double(i))
-                    let height = 10 * normalized * max(0.35, wobble) + 4
+                    let phase = t * (6.5 + Double(i) * 2.3) + Double(i) * 1.7
+                    let ambient = 0.5 + 0.5 * sin(phase)          // 0...1, always alive
+                    let drive = level * (0.6 + 0.4 * ambient)     // voice modulates on top
+                    let height = 5.0 + 17.0 * min(1.0, drive)
                     Capsule()
                         .fill(Brand.blue)
                         .frame(width: 4, height: height)
+                        .animation(.spring(response: 0.16, dampingFraction: 0.5), value: height)
                 }
             }
-            .frame(height: 22)
+            .frame(width: 46, height: 24, alignment: .center)
         }
     }
 }

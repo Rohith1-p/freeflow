@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import ServiceManagement
 import AVFoundation
+import AVFAudio
 import ApplicationServices
 
 enum AppTheme: String, CaseIterable, Identifiable {
@@ -42,9 +43,10 @@ struct SettingsView: View {
                 modelCard
                 aboutCard
             }
+            .padding(.top, 40)   // clear the traffic lights (fullSizeContentView)
             .padding(20)
         }
-        .frame(width: 480, height: 460)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             loginEnabled = SMAppService.mainApp.status == .enabled
@@ -87,7 +89,7 @@ struct SettingsView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(cornerRadius: 14)
+        .card(cornerRadius: 14)
     }
 
     private func settingRow(title: String, detail: String, @ViewBuilder trailing: () -> some View) -> some View {
@@ -157,13 +159,66 @@ struct SettingsView: View {
                     subtitle: "Required for dictation, hotkey, and paste.") {
             settingRow(title: "Microphone",
                        detail: "Needed to capture your voice while the key is held.") {
-                statusBadge(micGranted)
+                if micGranted {
+                    statusBadge(true)
+                } else if micDenied {
+                    grantButton("Open Settings", action: openMicSettings)
+                } else {
+                    grantButton("Request Access", action: requestMicPermission)
+                }
             }
             hairline
             settingRow(title: "Accessibility",
                        detail: "Global dictation key and pasting at the cursor.") {
-                statusBadge(axGranted)
+                if axGranted {
+                    statusBadge(true)
+                } else {
+                    grantButton("Open Settings", action: openAccessibilitySettings)
+                }
             }
+        }
+    }
+
+    private func grantButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Brand.inkDark))
+                .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var micDenied: Bool {
+        AVCaptureDevice.authorizationStatus(for: .audio) == .denied
+    }
+
+    private func requestMicPermission() {
+        if #available(macOS 14.0, *) {
+            AVAudioApplication.requestRecordPermission { _ in
+                DispatchQueue.main.async {
+                    micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                }
+            }
+        } else {
+            AVCaptureDevice.requestAccess(for: .audio) { _ in
+                DispatchQueue.main.async {
+                    micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                }
+            }
+        }
+    }
+
+    private func openMicSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
         }
     }
 

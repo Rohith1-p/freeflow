@@ -1,28 +1,36 @@
 import SwiftUI
+import Combine
+
+/// Shared UI routing so the menu bar can drive in-window navigation.
+@MainActor
+final class UIRouter: ObservableObject {
+    static let shared = UIRouter()
+    enum Page: String { case dictation, settings }
+    @Published var page: Page = .dictation
+}
 
 /// Switches between onboarding and the main experience.
 struct RootView: View {
     @ObservedObject var state: AppState
-    var onOpenSettings: () -> Void
 
     @ObservedObject private var store = Store.shared
 
     var body: some View {
         if store.settings.completedOnboarding {
-            MainView(state: state, onOpenSettings: onOpenSettings)
+            MainView(state: state)
         } else {
             OnboardingView(state: state)
         }
     }
 }
 
-/// WisprFlow-style home: sidebar, greeting, history, stats.
+/// Main experience: inset rounded sidebar (Dictation / Settings) + content.
 struct MainView: View {
     @ObservedObject var state: AppState
-    var onOpenSettings: () -> Void
-
+    @ObservedObject private var router = UIRouter.shared
     @ObservedObject private var store = Store.shared
     @State private var copiedEntry: DictationEntry?
+    @Namespace private var sidebarAnimation
 
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -38,92 +46,124 @@ struct MainView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 16) {
             sidebar
-            Divider()
-            VStack(spacing: 0) {
-                header
-                Divider()
-                if store.todaysEntries.isEmpty { emptyState } else { historyList }
-            }
-            Divider()
-            statsPanel
+            content
         }
-        .frame(minWidth: 680, minHeight: 460)
-        .background(.ultraThinMaterial)
+        .padding(12)
+        .frame(minWidth: 700, minHeight: 480)
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    // MARK: - Sidebar
+    // MARK: - Sidebar (inset rounded panel)
 
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
-                ZStack {
-                    Circle().fill(Brand.inkDark).frame(width: 32, height: 32)
-                    Text("🎙").font(.system(size: 15))
-                }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Freeflow").font(.system(size: 14, weight: .bold, design: .rounded))
-                    Text("Local dictation").font(.system(size: 10)).foregroundStyle(.secondary)
-                }
+                AppIconMark(size: 30)
+                Text("Freeflow")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
             }
-            .padding(14)
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+            .padding(.bottom, 14)
 
-            navRow(icon: "mic.fill", title: "Dictation", selected: true, badge: state.isRecording ? "●" : nil)
-                .onTapGesture {}
+            navItem(page: .dictation, icon: "mic.fill", title: "Dictation",
+                    badge: state.isRecording ? "●" : nil)
+            navItem(page: .settings, icon: "gearshape", title: "Settings", badge: nil)
 
             Spacer()
-
-            navRow(icon: "gearshape", title: "Settings", selected: false, badge: nil)
-                .onTapGesture { onOpenSettings() }
 
             Label("All local · nothing leaves your Mac", systemImage: "lock.shield")
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
-                .padding(12)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 6)
         }
-        .frame(width: 172)
+        .padding(8)
+        .frame(width: 176)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.primary.opacity(0.035))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 
-    private func navRow(icon: String, title: String, selected: Bool, badge: String?) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: icon)
-                .font(.system(size: 12))
-                .foregroundStyle(selected ? Brand.blue : .secondary)
-                .frame(width: 16)
+    private func navItem(page: UIRouter.Page, icon: String, title: String, badge: String?) -> some View {        let selected = router.page == page
+        return HStack(spacing: 9) {
+            ZStack {
+                // Sliding selection pill (animates between items)
+                if selected {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Brand.blue)
+                        .matchedGeometryEffect(id: "SidebarSelection", in: sidebarAnimation)
+                        .shadow(color: Brand.blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                }
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? .white : .secondary)
+                    .scaleEffect(selected ? 1.1 : 1.0)
+            }
+            .frame(width: 24, height: 24)
+
             Text(title)
                 .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                .foregroundStyle(selected ? Brand.ink : .secondary)
+                .foregroundStyle(selected ? Brand.blue : .primary)
             Spacer()
             if let badge {
-                Text(badge).font(.system(size: 12, weight: .bold)).foregroundStyle(.red)
+                Text(badge).font(.system(size: 11, weight: .bold)).foregroundStyle(.red)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background {
-            if selected { RoundedRectangle(cornerRadius: 8).fill(Brand.blueSoft) }
-        }
         .contentShape(Rectangle())
-        .padding(.horizontal, 8)
+        .onTapGesture {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                router.page = page
+            }
+        }
     }
 
-    // MARK: - Header
+    // MARK: - Content switching
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(greeting), get into the flow")
-                    .font(.system(size: 21, weight: .bold, design: .rounded))
-                Spacer()
-                statusPill
-            }
-            Text("Hold \(hotkeyName) and speak — your words land at your cursor.")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+    @ViewBuilder
+    private var content: some View {
+        switch router.page {
+        case .dictation: dictationPage
+        case .settings: SettingsView(state: state)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+    }
+
+    // MARK: - Dictation page
+
+    private var dictationPage: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(greeting), get into the flow")
+                        .font(.system(size: 21, weight: .bold, design: .rounded))
+                    Spacer()
+                    statusPill
+                }
+                Text("Hold \(hotkeyName) and speak — your words land at your cursor.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 6)
+            .padding(.top, 8)
+            .padding(.bottom, 14)
+
+            if store.todaysEntries.isEmpty {
+                emptyState
+            } else {
+                historyList
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     @ViewBuilder
@@ -146,8 +186,6 @@ struct MainView: View {
                 .foregroundStyle(.secondary)
         }
     }
-
-    // MARK: - History
 
     private var emptyState: some View {
         VStack(spacing: 12) {
@@ -178,6 +216,7 @@ struct MainView: View {
             }
         }
         .listStyle(.inset)
+        .card(cornerRadius: 14)
     }
 
     private func copy(_ entry: DictationEntry) {
@@ -187,43 +226,6 @@ struct MainView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             if copiedEntry?.id == entry.id { copiedEntry = nil }
         }
-    }
-
-    // MARK: - Stats
-
-    private var statsPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Your stats").font(.system(size: 14, weight: .bold))
-            statCard(title: "Total words", value: "\(store.totalWords)")
-            statCard(title: "Dictations today", value: "\(store.todaysEntries.count)")
-            statCard(title: "All time", value: "\(store.entries.count)")
-            Spacer()
-            if let last = store.entries.first, !last.text.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("LAST DICTATION").font(.system(size: 9, weight: .bold)).foregroundStyle(.tertiary)
-                    Text(last.text)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(4)
-                }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .glassCard(cornerRadius: 9)
-            }
-        }
-        .padding(14)
-        .frame(width: 186)
-    }
-
-    private func statCard(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-            Text(title).font(.system(size: 10)).foregroundStyle(.secondary)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(cornerRadius: 9)
     }
 }
 
@@ -244,10 +246,8 @@ struct EntryRow: View {
                     .font(.system(size: 13))
                     .textSelection(.enabled)
                 HStack(spacing: 10) {
-                    if entry.app != nil || true {
-                        Label(entry.app ?? "Unknown app", systemImage: "app")
-                            .font(.system(size: 9)).foregroundStyle(.tertiary)
-                    }
+                    Label(entry.app ?? "Unknown app", systemImage: "app")
+                        .font(.system(size: 9)).foregroundStyle(.tertiary)
                     if entry.wordCount > 0 {
                         Text("\(entry.wordCount) words").font(.system(size: 9)).foregroundStyle(.tertiary)
                     }

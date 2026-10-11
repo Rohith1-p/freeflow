@@ -11,7 +11,8 @@ let package = Package(
         .executableTarget(
             name: "Freeflow",
             dependencies: [.product(name: "FluidAudio", package: "FluidAudio")],
-            path: "Sources/Freeflow"
+            path: "Sources/Freeflow",
+            resources: [.copy("Resources")]
         ),
     ]
 )

@@ -1,42 +1,29 @@
 import SwiftUI
 
-/// Premium glass styling: real Liquid Glass on macOS 26+, frosted material
-/// fallback on macOS 14/15.
+/// Solid, clean card styling (MacParakeet-style): filled surface,
+/// hairline border, subtle lift. No translucency.
 extension View {
-    @ViewBuilder
-    func glassCard(cornerRadius: CGFloat = 12, interactive: Bool = false) -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(
-                interactive ? .regular.interactive() : .regular,
-                in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            )
-        } else {
-            self.background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
-            )
-        }
+    func card(cornerRadius: CGFloat = 12) -> some View {
+        background(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
     }
 
-    @ViewBuilder
-    func glassSidebar() -> some View {
-        if #available(macOS 26.0, *) {
-            self.background(.ultraThinMaterial)
-        } else {
-            self.background(.ultraThinMaterial)
-        }
-    }
-
-    @ViewBuilder
-    func glassCapsule() -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(.regular, in: Capsule())
-        } else {
-            self.background(Capsule().fill(.ultraThinMaterial))
-        }
+    /// Small pill/status surface.
+    func chipSurface(cornerRadius: CGFloat = 10) -> some View {
+        background(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 }
