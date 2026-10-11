@@ -299,6 +299,16 @@ struct OnboardingView: View {
                 action: "Open Settings", actionFn: openAccessibility
             )
 
+            if axGranted && !state.hotkeyActive {
+                permissionCard(
+                    icon: "waveform.path.ecg", tag: "macOS",
+                    title: "Input Monitoring",
+                    detail: "macOS may also ask for Input Monitoring. If Freeflow restarts after granting, that's normal — it will reopen itself automatically.",
+                    granted: false,
+                    action: "Open Settings", actionFn: openInputMonitoring
+                )
+            }
+
             Label("Freeflow never asks for screen recording, contacts, or your calendar.",
                   systemImage: "checkmark.shield")
                 .font(.system(size: 11)).foregroundStyle(.tertiary)
@@ -692,6 +702,12 @@ struct OnboardingView: View {
 
     private func openAccessibility() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func openInputMonitoring() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
             NSWorkspace.shared.open(url)
         }
     }

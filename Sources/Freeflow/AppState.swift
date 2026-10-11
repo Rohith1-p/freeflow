@@ -29,6 +29,43 @@ final class AppState: ObservableObject {
                 self?.overlay.updateLevel(rms)
             }
         }
+
+        if !hotkey.isActive {
+            // Accessibility/Input Monitoring not granted yet. macOS KILLS the
+            // app when the user grants Input Monitoring — install a watchdog
+            // that relaunches us if we disappear, so onboarding continues.
+            installRelaunchWatchdog()
+            retryTapUntilActive()
+        }
+    }
+
+    /// If the app is killed by the system (permission grant), reopen it.
+    private func installRelaunchWatchdog() {
+        let appPath = Bundle.main.bundlePath
+        let script = """
+        for i in $(seq 1 24); do
+            sleep 5
+            if ! pgrep -x Freeflow >/dev/null; then
+                open "\(appPath)"
+                exit 0
+            fi
+        done
+        """
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", script]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        try? p.run()
+    }
+
+    /// Retry creating the event tap until the permission lands.
+    private func retryTapUntilActive() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self, !self.hotkey.isActive else { return }
+            self.hotkey.start(keyCodes: [self.store.settings.hotkeyKeyCode])
+            self.retryTapUntilActive()
+        }
     }
 
     func restartHotkey() {
