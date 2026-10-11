@@ -23,6 +23,11 @@ chmod +x "$CONTENTS/MacOS/Freeflow"
 mkdir -p "$CONTENTS/Resources/freeflow"
 cp -r "$SRC_DIR/src/freeflow/"*.py "$CONTENTS/Resources/freeflow/"
 
+# Copy icon
+if [ -f "$SRC_DIR/app/AppIcon.icns" ]; then
+    cp "$SRC_DIR/app/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
+fi
+
 # Create a python path setup so freeflow is importable
 cat > "$CONTENTS/Resources/freeflow_path.py" << 'PYEOF'
 import sys
