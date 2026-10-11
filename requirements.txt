@@ -1,6 +1,0 @@
-moondream>=2.4.0
-pynput>=1.7.6
-sounddevice>=0.4.6
-pyobjc-framework-Cocoa>=10.0
-pyobjc-framework-Quartz>=10.0
-rumps>=0.4.0

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freeflow — Hold a key. Speak. Your words appear.</title>
+    <meta name="description" content="Free, open-source dictation for Mac. Fully local. No cloud, no account, no subscription.">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: #0d0d14; color: #e9eefa; line-height: 1.6; }
+
+        .hero { text-align: center; padding: 100px 20px 60px; }
+        .hero h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 16px; }
+        .hero h1 span { color: #7cc0ff; }
+        .hero p { font-size: 1.3rem; color: #8892b0; max-width: 600px; margin: 0 auto 40px; }
+        .hero .badge { display: inline-block; background: #1a2332; border: 1px solid #2a3a52; color: #7cc0ff; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; margin-bottom: 24px; }
+        .download-btn { display: inline-block; background: #2563eb; color: #fff; text-decoration: none; padding: 16px 48px; border-radius: 12px; font-size: 1.2rem; font-weight: 600; transition: background 0.2s; }
+        .download-btn:hover { background: #1d4ed8; }
+        .download-hint { font-size: 0.85rem; color: #5b6478; margin-top: 12px; }
+
+        .stats { display: flex; justify-content: center; gap: 60px; padding: 40px 20px; border-top: 1px solid #1a2332; border-bottom: 1px solid #1a2332; }
+        .stat { text-align: center; }
+        .stat .num { font-size: 2.5rem; font-weight: 800; color: #7cc0ff; }
+        .stat .label { font-size: 0.85rem; color: #5b6478; text-transform: uppercase; letter-spacing: 1px; }
+
+        .features { max-width: 900px; margin: 60px auto; padding: 0 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+        .feature { background: #151522; border: 1px solid #252540; border-radius: 16px; padding: 28px; }
+        .feature h3 { font-size: 1.1rem; margin-bottom: 8px; color: #e9eefa; }
+        .feature p { font-size: 0.9rem; color: #8892b0; }
+        .feature .icon { font-size: 2rem; margin-bottom: 12px; }
+
+        .how { text-align: center; padding: 60px 20px; background: #111118; }
+        .how h2 { font-size: 2rem; margin-bottom: 40px; }
+        .steps { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; }
+        .step { max-width: 250px; text-align: center; }
+        .step .circle { width: 60px; height: 60px; border-radius: 50%; background: #1a2332; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin: 0 auto 16px; border: 2px solid #2a3a52; }
+        .step h4 { margin-bottom: 8px; }
+        .step p { font-size: 0.85rem; color: #5b6478; }
+
+        .privacy { text-align: center; padding: 60px 20px; }
+        .privacy h2 { font-size: 2rem; margin-bottom: 16px; color: #7cc0ff; }
+        .privacy p { color: #8892b0; max-width: 500px; margin: 0 auto; }
+
+        footer { text-align: center; padding: 40px 20px; border-top: 1px solid #1a2332; color: #3d4460; font-size: 0.85rem; }
+        footer a { color: #5b6478; }
+
+        @media (max-width: 640px) {
+            .hero h1 { font-size: 2.2rem; }
+            .stats { flex-direction: column; gap: 20px; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="badge">100% Local · Open Source · Free Forever</div>
+        <h1>Hold a key. <span>Speak.</span><br>Your words appear.</h1>
+        <p>Freeflow is a dictation app for Mac that runs entirely on-device. No cloud, no account, no subscription. Just you and your voice.</p>
+        <a href="https://github.com/Rohith1-p/freeflow/releases/download/v1.0.0/Freeflow-v1.0.0.dmg" class="download-btn">↓ Download for Mac</a>
+        <div class="download-hint">macOS 13+ · 1 MB app + 178 MB model (auto-downloads) · Apple Silicon & Intel</div>
+    </div>
+
+    <div class="stats">
+        <div class="stat"><div class="num">0%</div><div class="label">WER on clean speech</div></div>
+        <div class="stat"><div class="num">45×</div><div class="label">Faster than realtime</div></div>
+        <div class="stat"><div class="num">0</div><div class="label">Network calls</div></div>
+        <div class="stat"><div class="num">178MB</div><div class="label">Model size</div></div>
+    </div>
+
+    <div class="features">
+        <div class="feature">
+            <div class="icon">🔒</div>
+            <h3>Fully Local</h3>
+            <p>Your voice never leaves your Mac. The speech model runs on-device. No servers, no API keys, no tracking.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">⚡️</div>
+            <h3>Fast</h3>
+            <p>Transcribes at 45× realtime. A 10-second utterance processes in 0.2 seconds. Feels instant.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">🎯</div>
+            <h3>Works Everywhere</h3>
+            <p>Cursor, browser, Slack, email, terminal — any text field on your Mac. Paste at your cursor position.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">⌨️</div>
+            <h3>Configurable Hotkey</h3>
+            <p>Hold any key to talk. Default is Control, but you choose what feels natural. Change it in settings anytime.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">🆓</div>
+            <h3>Free Forever</h3>
+            <p>No subscription, no usage limits, no locked features. Open source (MIT). Fork it, modify it, ship it.</p>
+        </div>
+        <div class="feature">
+            <div class="icon">📊</div>
+            <h3>Stats Dashboard</h3>
+            <p>Track words dictated, daily streak, and review your transcription history. All stored locally.</p>
+        </div>
+    </div>
+
+    <div class="how">
+        <h2>How it works</h2>
+        <div class="steps">
+            <div class="step">
+                <div class="circle">1</div>
+                <h4>Download & Open</h4>
+                <p>Drag to Applications, right-click → Open, complete the 60-second setup</p>
+            </div>
+            <div class="step">
+                <div class="circle">2</div>
+                <h4>Hold & Speak</h4>
+                <p>Hold your chosen key and talk naturally. The mic records while held.</p>
+            </div>
+            <div class="step">
+                <div class="circle">3</div>
+                <h4>Release & Paste</h4>
+                <p>Release the key. Your words appear at your cursor in under a second.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="privacy">
+        <h2>Your voice stays on your Mac.</h2>
+        <p>No cloud processing. No telemetry. No analytics. The transcription model runs entirely on your device. What you say is your business — not a training dataset.</p>
+    </div>
+
+    <footer>
+        <p><a href="https://github.com/Rohith1-p/freeflow">View on GitHub</a> · Built by <a href="https://rohithperumandla.me">Rohith Perumandla</a> · MIT License</p>
+    </footer>
+</body>
+</html>
