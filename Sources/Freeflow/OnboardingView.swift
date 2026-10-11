@@ -285,12 +285,18 @@ struct OnboardingView: View {
                 icon: "mic.fill", tag: "Required",
                 title: "Hear you while you dictate",
                 detail: micDenied
-                    ? "Microphone access was denied. Enable it in System Settings, then come back."
+                    ? "Access was denied earlier. Open Settings → Microphone and switch Freeflow on; this page updates by itself."
                     : "Freeflow listens only while you hold your dictation key.",
                 granted: micGranted,
                 action: micDenied ? "Open Microphone Settings" : "Request Access",
                 actionFn: micDenied ? openMicSettings : requestMic
             )
+            if !micGranted && !micDenied {
+                Button("Prompt didn't appear? Open Microphone Settings") { openMicSettings() }
+                    .buttonStyle(.link)
+                    .font(.system(size: 11))
+                    .padding(.top, -8)
+            }
             permissionCard(
                 icon: "keyboard", tag: "Required",
                 title: "Use your dictation key and type into any app",
@@ -665,8 +671,9 @@ struct OnboardingView: View {
     // MARK: - Actions & polling
 
     private func pollPermissions() {
+        micGranted = Self.micAuthorized()
         micTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+            micGranted = Self.micAuthorized()
         }
         axTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
             axGranted = AXIsProcessTrusted()
@@ -677,6 +684,14 @@ struct OnboardingView: View {
         AVCaptureDevice.authorizationStatus(for: .audio) == .denied
     }
 
+    /// Fresh permission read: the legacy AVCaptureDevice status can stay stale
+    /// in a running process after the user grants; AVAudioApplication is live.
+    static func micAuthorized() -> Bool {
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .authorized { return true }
+        if #available(macOS 14.0, *), AVAudioApplication.shared.recordPermission == .granted { return true }
+        return false
+    }
+
     private func openMicSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
             NSWorkspace.shared.open(url)
@@ -684,20 +699,16 @@ struct OnboardingView: View {
     }
 
     private func requestMic() {
-        // Modern API (macOS 14+); falls back to the legacy call.
+        // 1) Ask via the API — trust ITS answer, not a possibly-stale status read.
         if #available(macOS 14.0, *) {
-            AVAudioApplication.requestRecordPermission { _ in
+            AVAudioApplication.requestRecordPermission { granted in
                 DispatchQueue.main.async {
-                    micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-                }
-            }
-        } else {
-            AVCaptureDevice.requestAccess(for: .audio) { _ in
-                DispatchQueue.main.async {
-                    micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                    if granted { micGranted = true } else { micGranted = Self.micAuthorized() }
                 }
             }
         }
+        // 2) Also open the input briefly — the reliable trigger for the prompt.
+        state.pokeMicrophone()
     }
 
     private func openAccessibility() {

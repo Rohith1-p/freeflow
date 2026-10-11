@@ -74,6 +74,18 @@ final class AppState: ObservableObject {
 
     var hotkeyActive: Bool { hotkey.isActive }
 
+    /// Forces the macOS microphone permission prompt by actually opening the
+    /// input for a moment. `requestRecordPermission` alone does not reliably
+    /// show the prompt for this app; engine start always does.
+    func pokeMicrophone() {
+        guard !isRecording else { return }
+        try? recorder.start()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self, !self.isRecording else { return }
+            _ = self.recorder.stop()
+        }
+    }
+
     // MARK: - Dictation flow
 
     private func beginDictation() {

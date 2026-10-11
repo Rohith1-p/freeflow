@@ -139,10 +139,10 @@ struct SettingsView: View {
     @State private var permTimer: Timer?
 
     private func pollPermissions() {
-        micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        micGranted = OnboardingView.micAuthorized()
         axGranted = AXIsProcessTrusted()
         permTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
-            micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+            micGranted = OnboardingView.micAuthorized()
             axGranted = AXIsProcessTrusted()
         }
     }
@@ -196,18 +196,13 @@ struct SettingsView: View {
 
     private func requestMicPermission() {
         if #available(macOS 14.0, *) {
-            AVAudioApplication.requestRecordPermission { _ in
+            AVAudioApplication.requestRecordPermission { granted in
                 DispatchQueue.main.async {
-                    micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-                }
-            }
-        } else {
-            AVCaptureDevice.requestAccess(for: .audio) { _ in
-                DispatchQueue.main.async {
-                    micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                    micGranted = granted || OnboardingView.micAuthorized()
                 }
             }
         }
+        state.pokeMicrophone()  // the reliable trigger for the system prompt
     }
 
     private func openMicSettings() {
