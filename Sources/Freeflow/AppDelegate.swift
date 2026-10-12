@@ -14,6 +14,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         Self.shared = self
         NSApp.setActivationPolicy(.regular)  // Dock icon + menu bar icon
         AppTheme(rawValue: Store.shared.settings.theme)?.apply()
+        // Guarantee the wave shows in the Dock even if the icns is odd
+        if let icon = AppIconAsset.image {
+            NSApp.applicationIconImage = icon
+        }
         installStatusItem()
         state.startEngine()
 

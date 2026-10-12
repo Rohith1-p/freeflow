@@ -35,9 +35,12 @@ enum AppResources {
 }
 
 /// The Freeflow app icon, for in-app brand marks.
+/// PNG first — SwiftUI's renderer can't texture the icns legacy rep types
+/// reliably; a plain PNG always renders.
 enum AppIconAsset {
-    static let image: NSImage? = AppResources.url("AppIcon", ext: "icns")
-        .flatMap { NSImage(contentsOf: $0) }
+    static let image: NSImage? =
+        AppResources.url("AppIcon1024", ext: "png").flatMap { NSImage(contentsOf: $0) }
+        ?? AppResources.url("AppIcon", ext: "icns").flatMap { NSImage(contentsOf: $0) }
 }
 
 /// In-app brand mark: the bundled wave icon, rounded like an app icon.
