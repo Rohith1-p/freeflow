@@ -25,6 +25,7 @@
   <img src="https://img.shields.io/badge/macOS-14%2B-000000?style=flat-square&logo=macos&logoColor=white" alt="macOS 14+">
   <img src="https://img.shields.io/badge/Apple_Silicon-required-43BBFF?style=flat-square&logo=apple&logoColor=white" alt="Apple Silicon">
   <img src="https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white" alt="Swift 6">
+  <img src="https://img.shields.io/github/downloads/Rohith1-p/freeflow/total?style=flat-square&color=blue&label=downloads" alt="Downloads">
 </p>
 
 ---
