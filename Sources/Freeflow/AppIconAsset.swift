@@ -82,17 +82,22 @@ enum MenuIcon {
             ctx.setFillColor(CGColor(gray: 0, alpha: 1))  // pure black = template
             ctx.fillPath()
 
-            // Knock the wave out (transparent) with a bold stroke
+            // Knock the wave out (transparent) — shape matches the app icon:
+            // small crest → tall peak → deep valley → gentle recovery
             let path = CGMutablePath()
-            path.move(to: CGPoint(x: 3.2, y: 10.4))
-            path.addCurve(to: CGPoint(x: 7.2, y: 6.2),
-                          control1: CGPoint(x: 4.6, y: 8.8), control2: CGPoint(x: 5.7, y: 6.0))
-            path.addCurve(to: CGPoint(x: 10.0, y: 14.6),
-                          control1: CGPoint(x: 7.9, y: 6.6), control2: CGPoint(x: 8.3, y: 14.4))
-            path.addCurve(to: CGPoint(x: 13.2, y: 6.6),
-                          control1: CGPoint(x: 11.5, y: 14.8), control2: CGPoint(x: 12.0, y: 6.4))
-            path.addCurve(to: CGPoint(x: 16.8, y: 9.8),
-                          control1: CGPoint(x: 14.8, y: 6.8), control2: CGPoint(x: 15.7, y: 11.2))
+            path.move(to: CGPoint(x: 3.2, y: 10.6))
+            path.addCurve(to: CGPoint(x: 6.0, y: 8.2),
+                          control1: CGPoint(x: 4.2, y: 9.8), control2: CGPoint(x: 5.0, y: 8.0))
+            path.addCurve(to: CGPoint(x: 7.2, y: 10.2),
+                          control1: CGPoint(x: 6.6, y: 8.6), control2: CGPoint(x: 6.8, y: 10.0))
+            path.addCurve(to: CGPoint(x: 9.2, y: 5.0),
+                          control1: CGPoint(x: 7.8, y: 10.4), control2: CGPoint(x: 8.2, y: 5.6))
+            path.addCurve(to: CGPoint(x: 11.8, y: 15.0),
+                          control1: CGPoint(x: 10.2, y: 4.4), control2: CGPoint(x: 10.8, y: 14.6))
+            path.addCurve(to: CGPoint(x: 14.0, y: 8.6),
+                          control1: CGPoint(x: 12.8, y: 15.4), control2: CGPoint(x: 13.2, y: 9.4))
+            path.addCurve(to: CGPoint(x: 16.8, y: 10.2),
+                          control1: CGPoint(x: 14.9, y: 7.9), control2: CGPoint(x: 15.6, y: 9.2))
 
             ctx.addPath(path)
             ctx.setLineWidth(2.4)
