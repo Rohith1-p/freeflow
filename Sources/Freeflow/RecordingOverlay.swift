@@ -83,7 +83,7 @@ struct OverlayView: View {
                     .foregroundStyle(.white)
                 LevelBars(level: micLevel)
                     .frame(width: 46)
-                Text("Dictate")
+                Text("Listening")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(1)

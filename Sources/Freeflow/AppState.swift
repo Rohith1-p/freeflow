@@ -13,6 +13,7 @@ final class AppState: ObservableObject {
     let store = Store.shared
     let transcriber = Transcriber()
     let overlay = RecordingOverlay()
+    let notes = NoteEngine()
     private let recorder = AudioRecorder()
     private let hotkey = HotkeyMonitor()
     private var recordStart = Date()
@@ -91,6 +92,7 @@ final class AppState: ObservableObject {
     private func beginDictation() {
         keyIsDown = true
         guard !isRecording else { return }
+        guard !notes.isRunning else { return }   // note session owns the mic
         guard transcriber.isReady else { return }  // model not loaded yet
         do {
             try recorder.start()

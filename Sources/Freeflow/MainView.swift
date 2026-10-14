@@ -62,7 +62,7 @@ struct MainView: View {
         }
         .padding(14)
         .frame(minWidth: 860, minHeight: 580)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Brand.sageBG)
     }
 
     // MARK: - Sidebar
@@ -123,7 +123,7 @@ struct MainView: View {
                     .foregroundStyle(.green)
                 Text("Model ready").font(.system(size: 10.5, weight: .medium))
             case .downloading(let p):
-                ProgressView(value: p).tint(Brand.blue).frame(width: 60)
+                ProgressView(value: p).tint(Brand.accent).frame(width: 60)
                 Text("\(Int(p * 100))%").font(.system(size: 10, weight: .semibold).monospacedDigit())
             case .compiling:
                 ProgressView().controlSize(.mini)
@@ -146,7 +146,7 @@ struct MainView: View {
         return HStack(spacing: 9) {
             Image(systemName: icon)
                 .font(.system(size: 12))
-                .foregroundStyle(selected ? Brand.blue : .secondary)
+                .foregroundStyle(selected ? Brand.accent : .secondary)
                 .frame(width: 16)
             Text(title)
                 .font(.system(size: 13, weight: selected ? .semibold : .regular))
@@ -159,7 +159,7 @@ struct MainView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background {
-            if selected { RoundedRectangle(cornerRadius: 8).fill(Brand.blueSoft) }
+            if selected { RoundedRectangle(cornerRadius: 8).fill(Brand.accentSoft) }
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -208,10 +208,10 @@ struct MainView: View {
     private func keyCap(_ label: String) -> some View {
         Text(label)
             .font(.system(size: 12, weight: .bold, design: .rounded))
-            .foregroundStyle(Brand.blue)
+            .foregroundStyle(Brand.accent)
             .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Brand.blueSoft))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Brand.blue.opacity(0.35), lineWidth: 1))
+            .background(RoundedRectangle(cornerRadius: 6).fill(Brand.accentSoft))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Brand.accent.opacity(0.35), lineWidth: 1))
     }
 
     private var searchBar: some View {
@@ -235,7 +235,7 @@ struct MainView: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Brand.card)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
@@ -258,7 +258,7 @@ struct MainView: View {
                     }
                     if !dayEntries.isEmpty {
                         Text(group.label.uppercased())
-                            .font(.system(size: 10.5, weight: .semibold))
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                             .padding(.leading, 4)
                         VStack(spacing: 0) {
@@ -275,7 +275,7 @@ struct MainView: View {
                         .padding(.vertical, 4)
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color(nsColor: .controlBackgroundColor))
+                                .fill(Brand.card)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -291,10 +291,10 @@ struct MainView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             ZStack {
-                Circle().fill(Brand.blueSoft).frame(width: 64, height: 64)
+                Circle().fill(Brand.accentSoft).frame(width: 64, height: 64)
                 Image(systemName: "mic.fill")
                     .font(.system(size: 24))
-                    .foregroundStyle(Brand.blue)
+                    .foregroundStyle(Brand.accent)
             }
             Text("No dictations yet today")
                 .font(.system(size: 15, weight: .semibold))
@@ -347,7 +347,7 @@ struct MainView: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
                 Text(value)
-                    .font(.system(size: 26, weight: .semibold, design: .serif))
+                    .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(Brand.ink)
                 Text(label)
                     .font(.system(size: 11))

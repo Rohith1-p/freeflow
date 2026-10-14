@@ -43,7 +43,7 @@ final class AudioRecorder {
 
     // MARK: - Conversion
 
-    private static func to16kMono(buffer: AVAudioPCMBuffer, targetRate: Double) -> [Float] {
+    static func to16kMono(buffer: AVAudioPCMBuffer, targetRate: Double) -> [Float] {
         guard let channelPtrs = buffer.floatChannelData else { return [] }
         let frames = Int(buffer.frameLength)
         guard frames > 0 else { return [] }
@@ -79,7 +79,9 @@ final class AudioRecorder {
         return out
     }
 
-    private static func rms(_ samples: [Float]) -> Float? {
+    /// RMS of samples (0 on silence/empty). Used for level metering and
+    /// the note-session fallback segmenter.
+    static func rms(_ samples: [Float]) -> Float? {
         guard !samples.isEmpty else { return nil }
         var acc: Float = 0
         for s in samples { acc += s * s }

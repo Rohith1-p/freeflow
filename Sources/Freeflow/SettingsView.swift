@@ -47,7 +47,7 @@ struct SettingsView: View {
             .padding(20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Brand.sageBG)
         .onAppear {
             loginEnabled = SMAppService.mainApp.status == .enabled
             pollPermissions()
@@ -74,11 +74,11 @@ struct SettingsView: View {
             HStack(spacing: 10) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Brand.blueSoft)
+                        .fill(Brand.accentSoft)
                         .frame(width: 30, height: 30)
                     Image(systemName: icon)
                         .font(.system(size: 13))
-                        .foregroundStyle(Brand.blue)
+                        .foregroundStyle(Brand.accent)
                 }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title).font(.system(size: 15, weight: .bold))
@@ -127,7 +127,7 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 220)
                 .labelsHidden()
-                .tint(Brand.blue)
+                .tint(Brand.accent)
             }
         }
     }
@@ -231,14 +231,14 @@ struct SettingsView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 14).padding(.vertical, 6)
                         .background(RoundedRectangle(cornerRadius: 7).fill(
-                            capturing ? Brand.blue : Brand.inkDark))
+                            capturing ? Brand.accent : Brand.inkDark))
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(capturing ? Brand.blue : Color.clear, lineWidth: 2)
+                    .stroke(capturing ? Brand.accent : Color.clear, lineWidth: 2)
                     .padding(-4)
             )
         }
@@ -282,7 +282,7 @@ struct SettingsView: View {
                        detail: "Start Freeflow automatically when you sign in.") {
                 Toggle("", isOn: $loginEnabled)
                     .labelsHidden()
-                    .tint(Brand.blue)
+                    .tint(Brand.accent)
             }
             hairline
             settingRow(title: "Save dictations to history",
@@ -291,7 +291,7 @@ struct SettingsView: View {
                     get: { store.settings.showInHistory },
                     set: { store.settings.showInHistory = $0 }))
                     .labelsHidden()
-                    .tint(Brand.blue)
+                    .tint(Brand.accent)
             }
         }
     }
@@ -310,7 +310,7 @@ struct SettingsView: View {
                 case .downloading(let p):
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Downloading… \(Int(p * 100))%").font(.system(size: 12))
-                        ProgressView(value: p).tint(Brand.blue)
+                        ProgressView(value: p).tint(Brand.accent)
                     }
                 case .compiling:
                     Label("Compiling for Neural Engine…", systemImage: "gearshape.2")
@@ -327,7 +327,7 @@ struct SettingsView: View {
                     Button("Download") { Task { await state.transcriber.prepare() } }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
-                        .tint(Brand.blue)
+                        .tint(Brand.accent)
                 }
             }
         }

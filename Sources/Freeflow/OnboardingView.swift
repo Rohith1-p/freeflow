@@ -4,14 +4,6 @@ import AVFoundation
 import AVFAudio
 import ApplicationServices
 
-/// Freeflow brand palette: blue + black.
-enum Brand {
-    static let blue = Color(red: 0.13, green: 0.38, blue: 1.0)      // #2166FF
-    static let blueSoft = Color(red: 0.13, green: 0.38, blue: 1.0).opacity(0.10)
-    static let ink = Color(nsColor: .labelColor)                     // black
-    static let inkDark = Color(red: 0.07, green: 0.07, blue: 0.09)   // near-black buttons
-}
-
 /// First-run flow: sidebar + content, 5 steps.
 struct OnboardingView: View {
     @ObservedObject var state: AppState
@@ -65,7 +57,7 @@ struct OnboardingView: View {
             content
         }
         .frame(width: 740, height: 500)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Brand.sageBG)
         .onAppear { pollPermissions() }
         .onDisappear {
             micTimer?.invalidate(); axTimer?.invalidate()
@@ -88,7 +80,7 @@ struct OnboardingView: View {
 
             Text("Step \(step.rawValue + 1) of \(Step.allCases.count)")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Brand.blue)
+                .foregroundStyle(Brand.accent)
                 .padding(.bottom, 12)
 
             ForEach(Step.allCases, id: \.self) { s in
@@ -116,7 +108,7 @@ struct OnboardingView: View {
         return HStack(spacing: 9) {
             ZStack {
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(isCurrent ? Brand.blue : (isDone ? Color.green.opacity(0.12) : Color.secondary.opacity(0.1)))
+                    .fill(isCurrent ? Brand.accent : (isDone ? Color.green.opacity(0.12) : Color.secondary.opacity(0.1)))
                     .frame(width: 24, height: 24)
                 Image(systemName: isDone ? "checkmark" : s.icon)
                     .font(.system(size: 10, weight: .bold))
@@ -135,7 +127,7 @@ struct OnboardingView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
         .background {
-            if isCurrent { RoundedRectangle(cornerRadius: 9).fill(Brand.blueSoft) }
+            if isCurrent { RoundedRectangle(cornerRadius: 9).fill(Brand.accentSoft) }
         }
     }
 
@@ -144,7 +136,7 @@ struct OnboardingView: View {
         HStack(spacing: 8) {
             switch state.transcriber.state {
             case .downloading(let p):
-                ProgressView(value: p).tint(Brand.blue)
+                ProgressView(value: p).tint(Brand.accent)
                 Text("\(Int(p * 100))%").font(.system(size: 10, weight: .semibold).monospacedDigit())
             case .compiling:
                 ProgressView().controlSize(.mini)
@@ -232,10 +224,10 @@ struct OnboardingView: View {
             ZStack {
                 rings.frame(width: 128, height: 128)
                 ZStack {
-                    Circle().fill(Brand.blueSoft).frame(width: 62, height: 62)
+                    Circle().fill(Brand.accentSoft).frame(width: 62, height: 62)
                     Image(systemName: "mic.fill")
                         .font(.system(size: 25))
-                        .foregroundStyle(Brand.blue)
+                        .foregroundStyle(Brand.accent)
                 }
             }
             .padding(.top, 2)
@@ -357,7 +349,7 @@ struct OnboardingView: View {
                     }
                 case .downloading(let p):
                     VStack(alignment: .leading, spacing: 8) {
-                        ProgressView(value: p).tint(Brand.blue)
+                        ProgressView(value: p).tint(Brand.accent)
                         HStack {
                             Text("Downloading Parakeet v3 (~465 MB)")
                                 .font(.system(size: 13)).foregroundStyle(.secondary)
@@ -446,7 +438,7 @@ struct OnboardingView: View {
             .card(cornerRadius: 14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(state.keyIsDown ? Brand.blue : Color.clear, lineWidth: 2)
+                    .strokeBorder(state.keyIsDown ? Brand.accent : Color.clear, lineWidth: 2)
             )
             .animation(.easeOut(duration: 0.12), value: state.keyIsDown)
 
@@ -458,8 +450,8 @@ struct OnboardingView: View {
                     Text("Use ⌃ Control (recommended)")
                         .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 12).padding(.vertical, 7)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Brand.blueSoft))
-                        .foregroundStyle(Brand.blue)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Brand.accentSoft))
+                        .foregroundStyle(Brand.accent)
                 }
                 .buttonStyle(.plain)
                 Spacer()
@@ -468,7 +460,7 @@ struct OnboardingView: View {
             // Practice box
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
-                    Text("①").font(.system(size: 11, weight: .bold)).foregroundStyle(Brand.blue)
+                    Text("①").font(.system(size: 11, weight: .bold)).foregroundStyle(Brand.accent)
                     Text("Dictate into this box").font(.system(size: 13, weight: .semibold))
                     if state.isRecording {
                         Text("● listening").font(.system(size: 10, weight: .semibold)).foregroundStyle(.red)
@@ -528,8 +520,8 @@ struct OnboardingView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 34).padding(.vertical, 12)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Brand.blue))
-                .shadow(color: Brand.blue.opacity(0.35), radius: 12, y: 4)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Brand.accent))
+                .shadow(color: Brand.accent.opacity(0.35), radius: 12, y: 4)
             }
             .buttonStyle(.plain)
             .padding(.top, 22)
@@ -559,8 +551,8 @@ struct OnboardingView: View {
     private func featureCard(icon: String, title: String, body: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8).fill(Brand.blueSoft).frame(width: 30, height: 30)
-                Image(systemName: icon).font(.system(size: 13)).foregroundStyle(Brand.blue)
+                RoundedRectangle(cornerRadius: 8).fill(Brand.accentSoft).frame(width: 30, height: 30)
+                Image(systemName: icon).font(.system(size: 13)).foregroundStyle(Brand.accent)
             }
             Text(title).font(.system(size: 12, weight: .semibold))
             Text(body).font(.system(size: 10)).foregroundStyle(.secondary)
@@ -588,11 +580,11 @@ struct OnboardingView: View {
                                 granted: Bool, action: String, actionFn: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8).fill(granted ? Color.green.opacity(0.12) : Brand.blueSoft)
+                RoundedRectangle(cornerRadius: 8).fill(granted ? Color.green.opacity(0.12) : Brand.accentSoft)
                     .frame(width: 34, height: 34)
                 Image(systemName: granted ? "checkmark.circle.fill" : icon)
                     .font(.system(size: 14))
-                    .foregroundStyle(granted ? .green : Brand.blue)
+                    .foregroundStyle(granted ? .green : Brand.accent)
             }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -629,7 +621,7 @@ struct OnboardingView: View {
         Group {
             if capturingKey {
                 Label("Listening for key…", systemImage: "scope")
-                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(Brand.blue)
+                    .font(.system(size: 11, weight: .semibold)).foregroundStyle(Brand.accent)
             } else if state.keyIsDown {
                 Label("Heard it!", systemImage: "checkmark.circle.fill")
                     .font(.system(size: 11, weight: .semibold)).foregroundStyle(.green)
@@ -647,12 +639,12 @@ struct OnboardingView: View {
         return VStack(spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(lit ? Brand.blue : Color(nsColor: .controlBackgroundColor))
+                    .fill(lit ? Brand.accent : Brand.card)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .stroke(lit ? Brand.blue : Color.secondary.opacity(0.4), lineWidth: 2)
+                            .stroke(lit ? Brand.accent : Color.secondary.opacity(0.4), lineWidth: 2)
                     )
-                    .shadow(color: lit ? Brand.blue.opacity(0.45) : .black.opacity(0.12),
+                    .shadow(color: lit ? Brand.accent.opacity(0.45) : .black.opacity(0.12),
                             radius: lit ? 16 : 4, y: lit ? 0 : 2)
                     .frame(width: 150, height: 62)
                 VStack(spacing: 2) {
@@ -673,9 +665,11 @@ struct OnboardingView: View {
     private var rings: some View {
         ZStack {
             ForEach(0..<4, id: \.self) { i in
+                let ringOpacity = 0.10 - Double(i) * 0.02
+                let ringSize = CGFloat(60 + i * 46)
                 Circle()
-                    .stroke(Brand.blue.opacity(0.10 - Double(i) * 0.02), lineWidth: 1)
-                    .frame(width: CGFloat(60 + i * 46), height: CGFloat(60 + i * 46))
+                    .stroke(Brand.accent.opacity(ringOpacity), lineWidth: 1)
+                    .frame(width: ringSize, height: ringSize)
             }
         }
     }

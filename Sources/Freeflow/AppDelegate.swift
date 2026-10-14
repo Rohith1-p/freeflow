@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         Self.shared = self
         NSApp.setActivationPolicy(.regular)  // Dock icon + menu bar icon
         AppTheme(rawValue: Store.shared.settings.theme)?.apply()
+        NSLog("[Freeflow] accent = \(Brand.accent)")
         // Guarantee the wave shows in the Dock even if the icns is odd
         if let icon = AppIconAsset.image {
             NSApp.applicationIconImage = icon
@@ -53,6 +54,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
+
+        let notesItem = NSMenuItem(title: "Start Note Session", action: #selector(toggleNotes), keyEquivalent: "n")
+        notesItem.target = self
+        menu.addItem(notesItem)
 
         menu.addItem(.separator())
 
@@ -113,6 +118,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func showSettings() {
         UIRouter.shared.page = .settings
         showMainWindow()
+    }
+
+    @objc func toggleNotes() {
+        if state.notes.isRunning {
+            let text = state.notes.stop()
+            if !text.isEmpty {
+                state.store.add(text: text, duration: state.notes.elapsed, app: "📝 Notes")
+            }
+            self.notesWindow?.orderOut(nil)
+        } else {
+            guard state.transcriber.isReady else {
+                state.lastError = "Model still loading — try again in a moment"
+                return
+            }
+            state.notes.transcriber = state.transcriber
+            Task { await state.notes.start() }
+            showNotesWindow()
+        }
+    }
+
+    private var notesWindow: NSWindow?
+
+    private func showNotesWindow() {
+        if notesWindow == nil {
+            let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 460),
+                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                               backing: .buffered, defer: false)
+            win.title = "Freeflow Notes"
+            win.titlebarAppearsTransparent = true
+            win.titlebarSeparatorStyle = .none
+            win.backgroundColor = .clear
+            win.contentView = NSHostingView(rootView: NotesView(engine: state.notes) { [weak self] in
+                self?.notesWindow?.orderOut(nil)
+            })
+            win.center()
+            win.isReleasedWhenClosed = false
+            notesWindow = win
+        }
+        notesWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @objc func quit() {
