@@ -79,11 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Recording")
                     button.contentTintColor = .systemRed
                 } else {
-                    if let wave = MenuIcon.wave() {
-                        button.image = wave
-                    } else {
-                        button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Freeflow")
-                    }
+                    button.image = MenuIcon.badge()
                     button.contentTintColor = nil
                 }
             }
