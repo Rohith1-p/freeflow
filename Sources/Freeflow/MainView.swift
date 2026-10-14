@@ -5,7 +5,7 @@ import Combine
 @MainActor
 final class UIRouter: ObservableObject {
     static let shared = UIRouter()
-    enum Page: String { case dictation, settings }
+    enum Page { case dictation, settings }
     @Published var page: Page = .dictation
 }
 
@@ -24,13 +24,15 @@ struct RootView: View {
     }
 }
 
-/// Main experience: inset rounded sidebar (Dictation / Settings) + content.
+/// WisprFlow-style home: greeting with key badge, search, date-grouped
+/// history cards, and a today-stats panel. Sidebar switches pages.
 struct MainView: View {
     @ObservedObject var state: AppState
     @ObservedObject private var router = UIRouter.shared
     @ObservedObject private var store = Store.shared
     @State private var copiedEntry: DictationEntry?
     @Namespace private var sidebarAnimation
+    @State private var search = ""
 
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -41,6 +43,11 @@ struct MainView: View {
         }
     }
 
+    private var firstName: String {
+        let n = store.settings.userName.trimmingCharacters(in: .whitespaces)
+        return n.isEmpty ? "there" : n.split(separator: " ").first.map(String.init) ?? "there"
+    }
+
     private var hotkeyName: String {
         KeyNames.name(forCode: store.settings.hotkeyKeyCode)
     }
@@ -48,37 +55,50 @@ struct MainView: View {
     var body: some View {
         HStack(spacing: 16) {
             sidebar
-            content
+            switch router.page {
+            case .dictation: dictationPage
+            case .settings: SettingsView(state: state)
+            }
         }
-        .padding(12)
-        .frame(minWidth: 700, minHeight: 480)
+        .padding(14)
+        .frame(minWidth: 860, minHeight: 580)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    // MARK: - Sidebar (inset rounded panel)
+    // MARK: - Sidebar
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 AppIconMark(size: 30)
                 Text("Freeflow")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
             }
             .padding(.horizontal, 10)
-            .padding(.top, 6)
+            .padding(.top, 4)
             .padding(.bottom, 14)
 
-            navItem(page: .dictation, icon: "mic.fill", title: "Dictation",
+            navItem(icon: "mic.fill", title: "Dictation", page: .dictation,
                     badge: state.isRecording ? "●" : nil)
-            navItem(page: .settings, icon: "gearshape", title: "Settings", badge: nil)
+            navItem(icon: "gearshape", title: "Settings", page: .settings, badge: nil)
 
             Spacer()
 
-            Label("All local · nothing leaves your Mac", systemImage: "lock.shield")
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 10)
-                .padding(.bottom, 6)
+            VStack(alignment: .leading, spacing: 8) {
+                if state.isRecording {
+                    HStack(spacing: 6) {
+                        Circle().fill(.red).frame(width: 7, height: 7)
+                        Text("Recording…").font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundStyle(.red)
+                }
+
+                modelStatusRow
+
+                Label("All local · nothing leaves your Mac", systemImage: "lock.shield")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(8)
         .frame(width: 176)
@@ -93,33 +113,54 @@ struct MainView: View {
         )
     }
 
-    private func navItem(page: UIRouter.Page, icon: String, title: String, badge: String?) -> some View {        let selected = router.page == page
-        return HStack(spacing: 9) {
-            ZStack {
-                // Sliding selection pill (animates between items)
-                if selected {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Brand.blue)
-                        .matchedGeometryEffect(id: "SidebarSelection", in: sidebarAnimation)
-                        .shadow(color: Brand.blue.opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? .white : .secondary)
-                    .scaleEffect(selected ? 1.1 : 1.0)
+    @ViewBuilder
+    private var modelStatusRow: some View {
+        HStack(spacing: 6) {
+            switch state.transcriber.state {
+            case .ready:
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.green)
+                Text("Model ready").font(.system(size: 10.5, weight: .medium))
+            case .downloading(let p):
+                ProgressView(value: p).tint(Brand.blue).frame(width: 60)
+                Text("\(Int(p * 100))%").font(.system(size: 10, weight: .semibold).monospacedDigit())
+            case .compiling:
+                ProgressView().controlSize(.mini)
+                Text("Compiling…").font(.system(size: 10.5))
+            case .failed(let msg):
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11)).foregroundStyle(.orange)
+                Text("Model failed").font(.system(size: 10.5, weight: .medium))
+                    .help(msg)
+            case .loading, .idle:
+                ProgressView().controlSize(.mini)
+                Text("Loading model…").font(.system(size: 10.5))
             }
-            .frame(width: 24, height: 24)
+        }
+        .foregroundStyle(.secondary)
+    }
 
+    private func navItem(icon: String, title: String, page: UIRouter.Page, badge: String?) -> some View {
+        let selected = router.page == page
+        return HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundStyle(selected ? Brand.blue : .secondary)
+                .frame(width: 16)
             Text(title)
                 .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                .foregroundStyle(selected ? Brand.blue : .primary)
+                .foregroundStyle(selected ? Brand.ink : .primary.opacity(0.75))
             Spacer()
             if let badge {
-                Text(badge).font(.system(size: 11, weight: .bold)).foregroundStyle(.red)
+                Text(badge).font(.system(size: 12, weight: .bold)).foregroundStyle(.red)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+        .background {
+            if selected { RoundedRectangle(cornerRadius: 8).fill(Brand.blueSoft) }
+        }
         .contentShape(Rectangle())
         .onTapGesture {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -128,62 +169,122 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Content switching
-
-    @ViewBuilder
-    private var content: some View {
-        switch router.page {
-        case .dictation: dictationPage
-        case .settings: SettingsView(state: state)
-        }
-    }
-
     // MARK: - Dictation page
 
     private var dictationPage: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(greeting), get into the flow")
-                        .font(.system(size: 21, weight: .bold, design: .rounded))
-                    Spacer()
-                    statusPill
-                }
-                Text("Hold \(hotkeyName) and speak — your words land at your cursor.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 6)
-            .padding(.top, 8)
-            .padding(.bottom, 14)
-
-            if store.todaysEntries.isEmpty {
-                emptyState
-            } else {
-                historyList
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 16) {
+                greetingAndHistory
+                statsPanel
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    @ViewBuilder
-    private var statusPill: some View {
-        if state.isRecording {
-            HStack(spacing: 6) {
-                Circle().fill(.red).frame(width: 8, height: 8)
-                Text("Recording…").font(.system(size: 12, weight: .semibold))
+    private var greetingAndHistory: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 8) {
+                Text("\(firstName), start dictating with")
+                    .font(.system(size: 17, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                keyCap(hotkeyName)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 10).padding(.vertical, 5)
-            .background(Capsule().fill(Color.red.opacity(0.1)))
-            .foregroundStyle(.red)
-        } else if state.transcriber.isReady {
-            Label("Ready", systemImage: "checkmark.circle.fill")
+            .padding(.top, 6)
+
+            searchBar
+
+            if search.isEmpty && store.entries.isEmpty {
+                emptyState
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                historyScroll
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func keyCap(_ label: String) -> some View {
+        Text(label)
+            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .foregroundStyle(Brand.blue)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Brand.blueSoft))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Brand.blue.opacity(0.35), lineWidth: 1))
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.tertiary)
                 .font(.system(size: 12))
-                .foregroundStyle(.green)
-        } else {
-            Label("Loading model…", systemImage: "arrow.down.circle")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+            TextField("Search dictations", text: $search)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+            if !search.isEmpty {
+                Button {
+                    search = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private var filteredEntries: [DictationEntry] {
+        search.isEmpty
+            ? store.entries
+            : store.entries.filter { $0.text.localizedCaseInsensitiveContains(search) }
+    }
+
+    private var historyScroll: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                ForEach(store.groupedEntries, id: \.id) { group in
+                    let dayEntries = group.entries.filter {
+                        search.isEmpty || filteredEntries.contains($0)
+                    }
+                    if !dayEntries.isEmpty {
+                        Text(group.label.uppercased())
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 4)
+                        VStack(spacing: 0) {
+                            ForEach(Array(dayEntries.enumerated()), id: \.element.id) { idx, entry in
+                                EntryRow(entry: entry,
+                                         copied: copiedEntry?.id == entry.id,
+                                         onCopy: { copy(entry) },
+                                         onDelete: { store.delete(entry) })
+                                if idx < dayEntries.count - 1 {
+                                    Divider().opacity(0.5)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color(nsColor: .controlBackgroundColor))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+                        )
+                    }
+                }
+            }
+            .padding(.bottom, 12)
         }
     }
 
@@ -204,27 +305,54 @@ struct MainView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var historyList: some View {
-        List {
-            Section("Today") {
-                ForEach(store.todaysEntries) { entry in
-                    EntryRow(entry: entry,
-                             copied: copiedEntry?.id == entry.id,
-                             onCopy: { copy(entry) },
-                             onDelete: { store.delete(entry) })
-                }
-            }
-        }
-        .listStyle(.inset)
-        .card(cornerRadius: 14)
-    }
-
     private func copy(_ entry: DictationEntry) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(entry.text, forType: .string)
         copiedEntry = entry
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             if copiedEntry?.id == entry.id { copiedEntry = nil }
+        }
+    }
+
+    // MARK: - Stats panel
+
+    private var statsPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            statBig(value: "\(store.wordsToday)", label: "total words today")
+            statBig(value: "\(store.wpmToday)", label: "wpm today")
+            statBig(value: "\(store.streakDays)",
+                    label: store.streakDays == 1 ? "day streak" : "day streak 🔥")
+            Divider().opacity(0.4)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("All time").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
+                Text("\(store.entries.count) dictations · \(store.totalWords) words")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(16)
+        .frame(width: 170)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.035))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    private func statBig(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(value)
+                    .font(.system(size: 26, weight: .semibold, design: .serif))
+                    .foregroundStyle(Brand.ink)
+                Text(label)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 }
@@ -236,25 +364,17 @@ struct EntryRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
             Text(entry.timestamp.formatted(date: .omitted, time: .shortened))
                 .font(.system(size: 11).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 52, alignment: .leading)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(entry.text)
-                    .font(.system(size: 13))
-                    .textSelection(.enabled)
-                HStack(spacing: 10) {
-                    Label(entry.app ?? "Unknown app", systemImage: "app")
-                        .font(.system(size: 9)).foregroundStyle(.tertiary)
-                    if entry.wordCount > 0 {
-                        Text("\(entry.wordCount) words").font(.system(size: 9)).foregroundStyle(.tertiary)
-                    }
-                }
-            }
-            Spacer()
-            HStack(spacing: 8) {
+                .padding(.top, 2)
+            Text(entry.text)
+                .font(.system(size: 13))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 10) {
                 Button { onCopy() } label: {
                     Image(systemName: copied ? "checkmark" : "doc.on.doc")
                         .foregroundStyle(copied ? .green : .secondary)
@@ -262,12 +382,15 @@ struct EntryRow: View {
                 .buttonStyle(.borderless)
                 .help("Copy")
                 Button(action: onDelete) {
-                    Image(systemName: "trash").foregroundStyle(.secondary)
+                    Image(systemName: "trash")
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
                 .help("Delete")
             }
+            .opacity(0.85)
         }
-        .padding(.vertical, 3)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 }

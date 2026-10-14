@@ -91,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func showMainWindow() {
         if mainWindow == nil {
-            let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
+            let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 880, height: 600),
                                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                                backing: .buffered, defer: false)
             win.title = "Freeflow"

@@ -249,6 +249,18 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .padding(.top, 3)
 
+            VStack(alignment: .leading, spacing: 5) {
+                Text("What should we call you?")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                TextField("Your name", text: $store.settings.userName)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 220)
+                    .font(.system(size: 13))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.top, 10)
+
             HStack(alignment: .top, spacing: 12) {
                 featureCard(icon: "text.cursor", title: "Dictate anywhere",
                             body: "Your words land at the cursor, in any app.")

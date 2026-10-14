@@ -269,6 +269,15 @@ struct SettingsView: View {
     private var startupCard: some View {
         sectionCard(icon: "power", title: "Startup",
                     subtitle: "How Freeflow starts on your Mac.") {
+            settingRow(title: "Your name",
+                       detail: "Used in the greeting on your dashboard.") {
+                TextField("Your name", text: $store.settings.userName)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 150)
+                    .font(.system(size: 12))
+                    .multilineTextAlignment(.center)
+            }
+            hairline
             settingRow(title: "Launch at login",
                        detail: "Start Freeflow automatically when you sign in.") {
                 Toggle("", isOn: $loginEnabled)

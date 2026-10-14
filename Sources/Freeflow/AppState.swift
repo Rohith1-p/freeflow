@@ -96,7 +96,8 @@ final class AppState: ObservableObject {
             try recorder.start()
             recordStart = Date()
             isRecording = true
-            overlay.show(listening: true)
+            overlay.show(listening: true,
+                         key: KeyNames.name(forCode: store.settings.hotkeyKeyCode))
         } catch {
             lastError = "Mic error: \(error.localizedDescription)"
         }

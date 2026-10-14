@@ -6,10 +6,13 @@ import AppKit
 final class RecordingOverlay {
     private var panel: NSPanel?
 
-    func show(listening: Bool) {
+    func show(listening: Bool, key: String? = nil) {
         DispatchQueue.main.async { [self] in
             if panel == nil { create() }
-            update { $0.phase = listening ? .listening : .transcribing }
+            update {
+                $0.phase = listening ? .listening : .transcribing
+                if listening, let key { $0.keyLabel = key }
+            }
             panel?.orderFrontRegardless()
         }
     }
@@ -65,6 +68,7 @@ final class RecordingOverlay {
 struct OverlayView: View {
     enum Phase { case listening, transcribing }
     var phase: OverlayView.Phase = .listening
+    var keyLabel: String = ""
     // Plain var (NOT @State): we drive it from outside via rootView updates.
     // @State ignores externally injected values after first render — that
     // froze the level bars at their idle height.
@@ -79,11 +83,20 @@ struct OverlayView: View {
                     .foregroundStyle(.white)
                 LevelBars(level: micLevel)
                     .frame(width: 46)
-                Text("Listening…")
+                Text("Dictate")
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .fixedSize()
+                if !keyLabel.isEmpty {
+                    Text(keyLabel)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Brand.blue)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Capsule().fill(.white.opacity(0.92)))
+                        .lineLimit(1)
+                        .fixedSize()
+                }
             case .transcribing:
                 ProgressView()
                     .controlSize(.regular)

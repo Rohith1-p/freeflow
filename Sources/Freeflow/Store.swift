@@ -22,6 +22,7 @@ struct Settings: Codable, Equatable {
     var showInHistory = true
     var launchAtLogin = true
     var theme: String = "system"            // system | light | dark
+    var userName: String = ""               // for the greeting
 }
 
 /// JSON-backed storage for settings and dictation history.
@@ -66,6 +67,46 @@ final class Store: ObservableObject {
     var todaysEntries: [DictationEntry] {
         let cal = Calendar.current
         return entries.filter { cal.isDateInToday($0.timestamp) }
+    }
+
+    var wordsToday: Int {
+        todaysEntries.reduce(0) { $0 + $1.wordCount }
+    }
+
+    /// Words per minute across today's dictations.
+    var wpmToday: Int {
+        let secs = todaysEntries.reduce(0) { $0 + $1.durationSeconds }
+        let words = todaysEntries.reduce(0) { $0 + $1.wordCount }
+        guard secs > 0.5 else { return 0 }
+        return Int(Double(words) / (secs / 60))
+    }
+
+    /// Consecutive days (ending today or yesterday) with at least one dictation.
+    var streakDays: Int {
+        let cal = Calendar.current
+        var day = cal.startOfDay(for: Date())
+        if !entries.contains(where: { cal.isDate($0.timestamp, inSameDayAs: day) }) {
+            day = cal.date(byAdding: .day, value: -1, to: day)!
+        }
+        var streak = 0
+        while entries.contains(where: { cal.isDate($0.timestamp, inSameDayAs: day) }) {
+            streak += 1
+            day = cal.date(byAdding: .day, value: -1, to: day)!
+        }
+        return streak
+    }
+
+    /// History grouped by day, newest first. Labels: Today / Yesterday / date.
+    var groupedEntries: [(id: Date, label: String, entries: [DictationEntry])] {
+        let cal = Calendar.current
+        let dict = Dictionary(grouping: entries) { cal.startOfDay(for: $0.timestamp) }
+        return dict.keys.sorted(by: >).map { day in
+            let label: String
+            if cal.isDateInToday(day) { label = "Today" }
+            else if cal.isDateInYesterday(day) { label = "Yesterday" }
+            else { label = day.formatted(date: .long, time: .omitted) }
+            return (day, label, dict[day]!.sorted { $0.timestamp > $1.timestamp })
+        }
     }
 
     var totalWords: Int { entries.reduce(0) { $0 + $1.wordCount } }
