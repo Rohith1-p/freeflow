@@ -43,16 +43,16 @@
         .topbar nav a:hover { color: var(--accent); }
 
         /* hero */
-        .hero { max-width: 1100px; margin: 0 auto; padding: 90px 24px 70px; text-align: left; }
+        .hero { max-width: 1100px; margin: 0 auto; padding: 90px 24px 70px; text-align: center; }
         .kicker { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); letter-spacing: .04em;
-            display: flex; align-items: center; gap: 10px; margin-bottom: 34px; }
+            display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 34px; }
         .kicker::before { content: ""; width: 34px; height: 1px; background: var(--ink); display: inline-block; }
         .hero h1 { font-size: clamp(55px, 6.7vw, 96px); font-weight: 800; letter-spacing: -2.5px; line-height: 1.02;
             color: var(--ink); max-width: 900px; }
         .hero h1 em { font-style: normal; color: var(--accent); }
-        .hero .sub { font-size: clamp(17px, 2vw, 21px); color: var(--ink-soft); max-width: 640px; margin-top: 26px; }
+        .hero .sub { font-size: clamp(17px, 2vw, 21px); color: var(--ink-soft); max-width: 640px; margin: 26px auto 0; }
         .hero .tagline { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); margin-top: 30px; }
-        .download-row { margin-top: 38px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .download-row { margin-top: 38px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
         .download-btn { display: inline-block; background: var(--ink); color: #fff; text-decoration: none;
             padding: 16px 34px; border-radius: 4px; font-size: 16px; font-weight: 600; transition: background .2s; }
         .download-btn:hover { background: var(--accent); }
@@ -137,8 +137,8 @@
         <div class="download-row">
             <a href="https://github.com/Rohith1-p/freeflow/releases/download/v2.0.6/Freeflow-v2.0.6.dmg" class="download-btn">↓ Download for Mac — v2.0.6</a>
             <span class="download-hint">macOS 14+ · Apple Silicon · notarized</span>
+            <div class="dl-badge"><img src="https://img.shields.io/github/downloads/Rohith1-p/freeflow/total?style=flat-square&color=e8663a&label=downloads" alt="Downloads"></div>
         </div>
-        <div class="dl-badge"><img src="https://img.shields.io/github/downloads/Rohith1-p/freeflow/total?style=flat-square&color=e8663a&label=downloads" alt="Downloads"></div>
     </div>
 
     <div class="hero-shot-wrap">
