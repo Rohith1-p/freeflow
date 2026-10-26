@@ -19,6 +19,19 @@ final class AppState: ObservableObject {
     private let hotkey = HotkeyMonitor()
     private var recordStart = Date()
     private var transcriptionTask: Task<Void, Never>?
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        // Forward child-object changes (note engine, model state) so every
+        // view observing AppState re-renders — e.g. the live-session card
+        // appearing the instant a note session starts.
+        notes.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        transcriber.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+    }
 
     func startEngine() {
         hotkey.onKeyDown = { [weak self] in self?.hotkeyDown() }
