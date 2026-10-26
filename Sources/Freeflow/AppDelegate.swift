@@ -28,6 +28,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // Always show the main window on launch — users expect to see the app
         showMainWindow()
 
+        // Self-driving test mode: --test-notes starts a session after 6s and
+        // stops it at +45s. Used for automated end-to-end verification.
+        if CommandLine.arguments.contains("--test-notes") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 6_000_000_000)
+                LogFile.log("AUTO-TEST: starting notes session")
+                toggleNotes()
+                try? await Task.sleep(nanoseconds: 45_000_000_000)
+                LogFile.log("AUTO-TEST: stopping notes session")
+                toggleNotes()
+            }
+        }
+
         // In-app triggers for note sessions
         NotificationCenter.default.addObserver(forName: .init("FreeflowToggleNotes"), object: nil, queue: .main) { [weak self] _ in
             self?.toggleNotes()
@@ -134,6 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func finishNotesSession() {
         guard state.notes.isRunning else { return }
         let lines = state.notes.stop()
+        LogFile.log("finishNotes: lines=\(lines.count)")
         if !lines.isEmpty {
             let session = NoteSession(
                 id: UUID(),
@@ -145,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc func toggleNotes() {
+        LogFile.log("toggleNotes: running=\(state.notes.isRunning) modelReady=\(state.transcriber.isReady)")
         if state.notes.isRunning {
             finishNotesSession()
         } else {

@@ -57,6 +57,7 @@ final class NoteEngine: ObservableObject {
     private var samplesFed = 0              // absolute samples given to VAD
     private var lastEmitted = 0             // absolute start of next chunk
     private var sawSpeech = false
+    private var windowCount = 0
     private var vadErrors = 0
     private var fellBackToFixed = false
 
@@ -90,7 +91,7 @@ final class NoteEngine: ObservableObject {
         sawSpeech = false
         vadErrors = 0
         fellBackToFixed = (vad == nil || vadState == nil)
-        NSLog("[Notes] start: vad=\(vad != nil) fallback=\(fellBackToFixed) transcriber=\(transcriber != nil)")
+        LogFile.log("start: vad=\(vad != nil) fallback=\(fellBackToFixed) transcriber=\(transcriber != nil)")
 
         let stream = AsyncStream<[Float]> { cont in
             self.chunkContinuation = cont
@@ -107,7 +108,7 @@ final class NoteEngine: ObservableObject {
             try engine.start()
         } catch {
             input.removeTap(onBus: 0)
-            NSLog("[Notes] mic error: \(error.localizedDescription)")
+            LogFile.log("mic error: \(error.localizedDescription)")
             return
         }
 
@@ -147,8 +148,8 @@ final class NoteEngine: ObservableObject {
             ProcessInfo.processInfo.endActivity(activity)
             self.activity = nil
         }
-        // flush whatever speech remains in the examined buffer
-        if sawSpeech || examined.count >= Self.minChunk {
+        // flush any in-flight speech segment (never plain trailing silence)
+        if sawSpeech {
             let offset = TimeInterval(lastEmitted) / Double(Self.sampleRate)
             let segment = examined
             examined = []
@@ -183,12 +184,18 @@ final class NoteEngine: ObservableObject {
                 vadState = result.state
                 vadErrors = 0
 
+                windowCount += 1
+                if windowCount % 10 == 0 {
+                    LogFile.log("windows=\(windowCount) prob=\(String(format: "%.3f", result.probability)) inSpeech=\(isSpeaking) buf=\(examined.count)")
+                }
                 switch result.event?.kind {
                 case .speechStart:
                     sawSpeech = true
                     isSpeaking = true
+                    LogFile.log("speechStart @\(result.event?.sampleIndex ?? -1)")
                 case .speechEnd:
                     isSpeaking = false
+                    LogFile.log("speechEnd @\(result.event?.sampleIndex ?? -1)")
                     if let event = result.event {
                         let cut = min(event.sampleIndex, samplesFed)
                         emitUpTo(cut)
@@ -205,7 +212,7 @@ final class NoteEngine: ObservableObject {
                 vadErrors += 1
                 if vadErrors >= 3 {
                     fellBackToFixed = true
-                    NSLog("[Notes] VAD failed 3x — falling back to fixed windows")
+                    LogFile.log("VAD failed 3x — fallback to fixed windows")
                 }
             }
         }
@@ -219,6 +226,7 @@ final class NoteEngine: ObservableObject {
         examined.removeFirst(length)
         lastEmitted = absoluteCut
         sawSpeech = false
+        LogFile.log("emit segment: \(segment.count) samples")
         let offset = TimeInterval(lastEmitted - segment.count) / Double(Self.sampleRate)
         transcribeSegment(segment, offset: offset)
     }
@@ -246,10 +254,15 @@ final class NoteEngine: ObservableObject {
     }
 
     private func transcribeSegment(_ samples: [Float], offset: TimeInterval) {
+        // Capture the PREVIOUS chain before overwriting — awaiting
+        // `transcriptionChain` inside the new task would await ITSELF
+        // (the property is reassigned to this very Task) and deadlock.
+        let previous = transcriptionChain
         transcriptionChain = Task { [weak self] in
-            await self?.transcriptionChain?.value
+            await previous?.value
             guard let self, let raw = await self.transcriber?.transcribe(samples) else { return }
             let cleaned = TextCleaner.clean(raw, removeFillers: Store.shared.settings.removeFillers)
+            LogFile.log("transcribed: \(cleaned.prefix(60))")
             guard !cleaned.isEmpty else { return }
             await MainActor.run {
                 self.lines.append(NoteLine(offsetSeconds: offset, text: cleaned))
