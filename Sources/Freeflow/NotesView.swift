@@ -121,13 +121,12 @@ struct NotesListView: View {
                 Text("Notes")
                     .font(.system(size: 17, weight: .bold))
                 Spacer()
-                startButton
                 if !store.noteSessions.isEmpty {
                     Text("\(store.noteSessions.count) sessions")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
-                    startButton
                 }
+                startButton
             }
             .padding(.top, 6)
 
@@ -157,7 +156,6 @@ struct NotesListView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                    startButton
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
