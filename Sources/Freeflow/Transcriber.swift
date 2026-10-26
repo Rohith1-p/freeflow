@@ -69,5 +69,19 @@ final class Transcriber: ObservableObject {
         }
     }
 
+    /// Transcribes a live-streaming slice, carrying decoder context across
+    /// slices so consecutive chunks read as one continuous transcript.
+    func transcribeSlice(_ samples: [Float], decoder: inout TdtDecoderState) async -> String? {
+        guard let manager else { return nil }
+        do {
+            let result = try await manager.transcribe(samples, decoderState: &decoder)
+            let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? nil : text
+        } catch {
+            FileHandle.standardError.write(Data("slice transcribe error: \(error)\n".utf8))
+            return nil
+        }
+    }
+
     var isReady: Bool { state == .ready }
 }

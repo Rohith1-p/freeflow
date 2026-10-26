@@ -47,7 +47,7 @@ enum Paster {
         up?.post(tap: .cgAnnotatedSessionEventTap)
 
         // Let the target app process the paste before restoring the clipboard
-        usleep(350_000)
+        usleep(600_000)
         cleared = true
 
         if !savedItems.isEmpty {

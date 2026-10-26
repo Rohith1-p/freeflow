@@ -5,7 +5,7 @@ import Combine
 @MainActor
 final class UIRouter: ObservableObject {
     static let shared = UIRouter()
-    enum Page { case dictation, settings }
+    enum Page { case dictation, notes, settings }
     @Published var page: Page = .dictation
 }
 
@@ -57,6 +57,7 @@ struct MainView: View {
             sidebar
             switch router.page {
             case .dictation: dictationPage
+            case .notes: NotesListView(state: state)
             case .settings: SettingsView(state: state)
             }
         }
@@ -80,6 +81,8 @@ struct MainView: View {
 
             navItem(icon: "mic.fill", title: "Dictation", page: .dictation,
                     badge: state.isRecording ? "●" : nil)
+            navItem(icon: "note.text", title: "Notes", page: .notes,
+                    badge: state.notes.isRunning ? "●" : nil)
             navItem(icon: "gearshape", title: "Settings", page: .settings, badge: nil)
 
             Spacer()

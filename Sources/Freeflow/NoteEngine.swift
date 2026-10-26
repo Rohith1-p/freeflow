@@ -2,15 +2,37 @@ import Foundation
 import AVFoundation
 import FluidAudio
 
-struct NoteLine: Identifiable {
-    let id = UUID()
+struct NoteLine: Identifiable, Codable {
+    let id: UUID
     let offsetSeconds: TimeInterval
     let text: String
+
+    init(id: UUID = UUID(), offsetSeconds: TimeInterval, text: String) {
+        self.id = id
+        self.offsetSeconds = offsetSeconds
+        self.text = text
+    }
 }
 
-/// Continuous note-taking: mic runs until stopped, Silero VAD splits speech
-/// into segments at natural pauses, and each segment is transcribed live and
-/// appended as its own line. Speak → line appears. Pause → new line next.
+/// A saved note-taking session.
+struct NoteSession: Identifiable, Codable {
+    let id: UUID
+    let startedAt: Date
+    let durationSeconds: Double
+    let lines: [NoteLine]
+
+    var fullText: String { lines.map(\.text).joined(separator: "\n") }
+    var preview: String { lines.first?.text ?? "(empty)" }
+    var wordCount: Int {
+        lines.reduce(0) { $0 + $1.text.split(separator: " ").count }
+    }
+}
+
+/// Continuous note-taking. Mic runs until stopped; Silero VAD is fed in exact
+/// `VadManager.chunkSize` windows (4096 samples — the model pads/truncates to
+/// that size, so feeding arbitrary sizes corrupts its event timeline); each
+/// speech-end boundary emits a chunk that is transcribed live and appended
+/// as its own line. Speak → line appears at each pause.
 @MainActor
 final class NoteEngine: ObservableObject {
     @Published var lines: [NoteLine] = []
@@ -19,19 +41,32 @@ final class NoteEngine: ObservableObject {
     @Published var elapsed: TimeInterval = 0
 
     private let engine = AVAudioEngine()
-    private var sessionStart: Date?
-    private var segmentBuffer: [Float] = []
-    private var inSpeech = false
+    private(set) var sessionStart: Date?
+    var sessionStartedAt: Date? { sessionStart }
     private var running = false
-    private var lineOffsetBase: TimeInterval = 0
     private var transcriptionChain: Task<Void, Never>?
     private var activity: NSObjectProtocol?
     private var elapsedTimer: Timer?
     private var chunkContinuation: AsyncStream<[Float]>.Continuation?
 
+    // VAD pipeline (lockstep windows, absolute sample accounting)
     private var vad: VadManager?
     private var vadState: VadStreamState?
-    private var useVAD = false
+    private var pendingVAD: [Float] = []    // staged, not yet VAD-examined
+    private var examined: [Float] = []      // VAD-examined, not yet emitted
+    private var samplesFed = 0              // absolute samples given to VAD
+    private var lastEmitted = 0             // absolute start of next chunk
+    private var sawSpeech = false
+    private var vadErrors = 0
+    private var fellBackToFixed = false
+
+    private static let sampleRate = 16_000
+    private static let vadWindow = VadManager.chunkSize      // 4096
+    private static let minChunk = sampleRate                  // 1.0 s
+    private static let maxChunk = 10 * sampleRate             // force-emit
+    private static let forceTail = sampleRate / 4             // 0.25 s overlap
+    private static let fixedWindow = 5 * sampleRate           // fallback
+    private static let fixedEmit = 4 * sampleRate             // 1 s overlap
 
     var transcriber: Transcriber?
 
@@ -39,19 +74,23 @@ final class NoteEngine: ObservableObject {
         guard !isRunning else { return }
         lines = []
         sessionStart = Date()
-        lineOffsetBase = 0
 
-        // Streaming VAD (Silero). Falls back to an RMS gate if unavailable.
-        do {
-            let manager = try await VadManager(config: VadConfig(defaultThreshold: 0.55))
+        if let manager = try? await VadManager(config: VadConfig(defaultThreshold: 0.55)) {
             vad = manager
             vadState = await manager.makeStreamState()
-            useVAD = true
-        } catch {
+        } else {
             vad = nil
             vadState = nil
-            useVAD = false
         }
+
+        pendingVAD = []
+        examined = []
+        samplesFed = 0
+        lastEmitted = 0
+        sawSpeech = false
+        vadErrors = 0
+        fellBackToFixed = (vad == nil || vadState == nil)
+        NSLog("[Notes] start: vad=\(vad != nil) fallback=\(fellBackToFixed) transcriber=\(transcriber != nil)")
 
         let stream = AsyncStream<[Float]> { cont in
             self.chunkContinuation = cont
@@ -60,7 +99,7 @@ final class NoteEngine: ObservableObject {
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
-            let samples = AudioRecorder.to16kMono(buffer: buffer, targetRate: 16000)
+            let samples = AudioRecorder.to16kMono(buffer: buffer, targetRate: 16_000)
             self?.chunkContinuation?.yield(samples)
         }
         engine.prepare()
@@ -68,13 +107,13 @@ final class NoteEngine: ObservableObject {
             try engine.start()
         } catch {
             input.removeTap(onBus: 0)
+            NSLog("[Notes] mic error: \(error.localizedDescription)")
             return
         }
 
         running = true
         isRunning = true
 
-        // Keep the Mac awake during long note sessions
         activity = ProcessInfo.processInfo.beginActivity(
             options: [.idleSystemSleepDisabled],
             reason: "Freeflow note session")
@@ -84,20 +123,18 @@ final class NoteEngine: ObservableObject {
             self.elapsed = Date().timeIntervalSince(start)
         }
 
-        // Serial processing loop: chunks are VAD-checked strictly in order.
         let t = transcriber
-        let proc = Task { [weak self] in
+        Task { [weak self] in
             for await chunk in stream {
                 guard let self, self.running else { break }
-                await self.handleChunk(chunk, transcriber: t)
+                await self.ingest(chunk, transcriber: t)
             }
         }
-        _ = proc
     }
 
-    /// Stops the session, returns the full note text.
-    func stop() -> String {
-        guard isRunning else { return "" }
+    /// Stops the session, returns the saved lines.
+    func stop() -> [NoteLine] {
+        guard isRunning else { return [] }
         running = false
         isRunning = false
         isSpeaking = false
@@ -110,89 +147,112 @@ final class NoteEngine: ObservableObject {
             ProcessInfo.processInfo.endActivity(activity)
             self.activity = nil
         }
-        // flush any pending speech segment
-        let tail = segmentBuffer
-        segmentBuffer = []
-        inSpeech = false
-        if tail.count > 8000 {
-            let offset = Date().timeIntervalSince(sessionStart ?? Date()) - Double(tail.count) / 16_000
-            transcribeSegment(tail, offset: max(0, offset))
+        // flush whatever speech remains in the examined buffer
+        if sawSpeech || examined.count >= Self.minChunk {
+            let offset = TimeInterval(lastEmitted) / Double(Self.sampleRate)
+            let segment = examined
+            examined = []
+            lastEmitted = samplesFed
+            if segment.count >= Self.minChunk / 2 {  // accept shorter final tails
+                transcribeSegment(segment, offset: offset)
+            }
         }
-        return lines.map { $0.text }.joined(separator: "\n")
+        return lines
     }
 
-    // MARK: - Chunk pipeline (serial: called from the processing loop)
+    // MARK: - Ingest (serial; called only from the processing loop)
 
-    private func handleChunk(_ chunk: [Float], transcriber: Transcriber?) async {
-        let now = Date().timeIntervalSince(sessionStart ?? Date())
+    private func ingest(_ chunk: [Float], transcriber: Transcriber?) async {
+        pendingVAD.append(contentsOf: chunk)
 
-        if useVAD {
-            guard let vad, var st = vadState else {
-                rmsHandle(chunk, now: now)
-                return
-            }
+        if fellBackToFixed {
+            fixedDrain()
+            return
+        }
+
+        while pendingVAD.count >= Self.vadWindow {
+            let window = Array(pendingVAD.prefix(Self.vadWindow))
+            pendingVAD.removeFirst(Self.vadWindow)
+            examined.append(contentsOf: window)
+            samplesFed += window.count
+
+            guard let vad, let state = vadState else { continue }
             do {
                 let result = try await vad.processStreamingChunk(
-                    chunk, state: st, config: .default, returnSeconds: true)
-                st = result.state
+                    window, state: state, config: .default)
+                vadState = result.state
+                vadErrors = 0
 
                 switch result.event?.kind {
                 case .speechStart:
-                    startSpeech(chunk)
+                    sawSpeech = true
+                    isSpeaking = true
                 case .speechEnd:
-                    if inSpeech {
-                        segmentBuffer.append(contentsOf: chunk)
-                        finishSegment(now)
+                    isSpeaking = false
+                    if let event = result.event {
+                        let cut = min(event.sampleIndex, samplesFed)
+                        emitUpTo(cut)
                     }
                 default:
-                    if inSpeech { segmentBuffer.append(contentsOf: chunk) }
+                    break
+                }
+
+                // never let a single line run past maxChunk
+                if examined.count >= Self.maxChunk {
+                    forceEmit()
                 }
             } catch {
-                useVAD = false  // don't retry every chunk
-                rmsHandle(chunk, now: now)
-            }
-        } else {
-            rmsHandle(chunk, now: now)
-        }
-    }
-
-    private func startSpeech(_ chunk: [Float]) {
-        inSpeech = true
-        segmentBuffer = chunk
-        isSpeaking = true
-    }
-
-    /// RMS gate fallback: 0.6 s of quiet ends a segment.
-    private func rmsHandle(_ chunk: [Float], now: Double) {
-        let rms = AudioRecorder.rms(chunk) ?? 0
-        if !inSpeech && rms > 0.015 {
-            startSpeech(chunk)
-        } else if inSpeech {
-            segmentBuffer.append(contentsOf: chunk)
-            let tail = segmentBuffer.suffix(9_600)  // 0.6 s
-            if (AudioRecorder.rms(Array(tail)) ?? 1) < 0.008 {
-                finishSegment(now)
+                vadErrors += 1
+                if vadErrors >= 3 {
+                    fellBackToFixed = true
+                    NSLog("[Notes] VAD failed 3x — falling back to fixed windows")
+                }
             }
         }
     }
 
-    private func finishSegment(_ now: Double) {
-        inSpeech = false
-        isSpeaking = false
-        let samples = segmentBuffer
-        segmentBuffer = []
-        guard samples.count > 8_000 else { return }  // < 0.5 s — ignore
-        let offset = max(0, now - Double(samples.count) / 16_000)
-        transcribeSegment(samples, offset: offset)
+    /// Emits `[lastEmitted, cut)` as one transcribed line (retroactive cut).
+    private func emitUpTo(_ absoluteCut: Int) {
+        let length = absoluteCut - lastEmitted
+        guard length >= Self.minChunk, length <= examined.count else { return }
+        let segment = Array(examined.prefix(length))
+        examined.removeFirst(length)
+        lastEmitted = absoluteCut
+        sawSpeech = false
+        let offset = TimeInterval(lastEmitted - segment.count) / Double(Self.sampleRate)
+        transcribeSegment(segment, offset: offset)
+    }
+
+    /// Force cut at maxChunk, keeping a short overlap tail for word continuity.
+    private func forceEmit() {
+        guard examined.count > Self.forceTail else { return }
+        let emitLength = examined.count - Self.forceTail
+        let segment = Array(examined.prefix(emitLength))
+        examined.removeFirst(emitLength)
+        lastEmitted += emitLength
+        let offset = TimeInterval(lastEmitted - segment.count) / Double(Self.sampleRate)
+        transcribeSegment(segment, offset: offset)
+    }
+
+    /// Degraded mode: fixed windows with overlap, no VAD.
+    private func fixedDrain() {
+        while examined.count >= Self.fixedWindow {
+            let segment = Array(examined.prefix(Self.fixedEmit))
+            examined.removeFirst(Self.fixedEmit)
+            lastEmitted += Self.fixedEmit
+            let offset = TimeInterval(lastEmitted - segment.count) / Double(Self.sampleRate)
+            transcribeSegment(segment, offset: offset)
+        }
     }
 
     private func transcribeSegment(_ samples: [Float], offset: TimeInterval) {
-        // Chain transcriptions so overlapping segments stay in order.
         transcriptionChain = Task { [weak self] in
             await self?.transcriptionChain?.value
-            guard let self, let text = await self.transcriber?.transcribe(samples), !text.isEmpty else { return }
+            guard let self, let raw = await self.transcriber?.transcribe(samples) else { return }
+            let cleaned = TextCleaner.clean(raw, removeFillers: Store.shared.settings.removeFillers)
+            guard !cleaned.isEmpty else { return }
             await MainActor.run {
-                self.lines.append(NoteLine(offsetSeconds: offset, text: text))
+                self.lines.append(NoteLine(offsetSeconds: offset, text: cleaned))
             }
         }
     }

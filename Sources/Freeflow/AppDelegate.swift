@@ -27,6 +27,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         // Always show the main window on launch — users expect to see the app
         showMainWindow()
+
+        // In-app triggers for note sessions
+        NotificationCenter.default.addObserver(forName: .init("FreeflowToggleNotes"), object: nil, queue: .main) { [weak self] _ in
+            self?.toggleNotes()
+        }
+
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -58,6 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let notesItem = NSMenuItem(title: "Start Note Session", action: #selector(toggleNotes), keyEquivalent: "n")
         notesItem.target = self
         menu.addItem(notesItem)
+
+        let copyRecentItem = NSMenuItem(title: "Copy Last Dictation", action: #selector(copyRecent), keyEquivalent: "c")
+        copyRecentItem.target = self
+        menu.addItem(copyRecentItem)
 
         menu.addItem(.separator())
 
@@ -120,13 +130,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         showMainWindow()
     }
 
+    /// Single save path: stops the engine, persists the session, hides the window.
+    private func finishNotesSession() {
+        guard state.notes.isRunning else { return }
+        let lines = state.notes.stop()
+        if !lines.isEmpty {
+            let session = NoteSession(
+                id: UUID(),
+                startedAt: state.notes.sessionStartedAt ?? Date(),
+                durationSeconds: state.notes.elapsed,
+                lines: lines)
+            state.store.addNote(session)
+        }
+    }
+
     @objc func toggleNotes() {
         if state.notes.isRunning {
-            let text = state.notes.stop()
-            if !text.isEmpty {
-                state.store.add(text: text, duration: state.notes.elapsed, app: "📝 Notes")
-            }
-            self.notesWindow?.orderOut(nil)
+            finishNotesSession()
         } else {
             guard state.transcriber.isReady else {
                 state.lastError = "Model still loading — try again in a moment"
@@ -134,30 +154,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             state.notes.transcriber = state.transcriber
             Task { await state.notes.start() }
-            showNotesWindow()
+            UIRouter.shared.page = .notes
+            showMainWindow()
         }
     }
 
-    private var notesWindow: NSWindow?
-
-    private func showNotesWindow() {
-        if notesWindow == nil {
-            let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: 460),
-                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-                               backing: .buffered, defer: false)
-            win.title = "Freeflow Notes"
-            win.titlebarAppearsTransparent = true
-            win.titlebarSeparatorStyle = .none
-            win.backgroundColor = .clear
-            win.contentView = NSHostingView(rootView: NotesView(engine: state.notes) { [weak self] in
-                self?.notesWindow?.orderOut(nil)
-            })
-            win.center()
-            win.isReleasedWhenClosed = false
-            notesWindow = win
-        }
-        notesWindow?.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+    /// Copies the most recent dictation to the clipboard — recovery path
+    /// when a paste didn't land in the target app.
+    @objc func copyRecent() {
+        guard let last = Store.shared.entries.first else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(last.text, forType: .string)
     }
 
     @objc func quit() {

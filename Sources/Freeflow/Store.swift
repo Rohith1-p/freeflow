@@ -16,6 +16,24 @@ struct DictationEntry: Identifiable, Codable, Equatable {
 }
 
 /// App settings, persisted as JSON.
+enum InputMode: String, CaseIterable, Identifiable, Codable {
+    case holdAndSpeak
+    case freeflowSpeech
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .holdAndSpeak: return "Hold & speak"
+        case .freeflowSpeech: return "Freeflow speech"
+        }
+    }
+    var caption: String {
+        switch self {
+        case .holdAndSpeak: return "Hold the key while talking. Release to paste."
+        case .freeflowSpeech: return "Double-tap the key to start. Words flow live. Double-tap again to stop."
+        }
+    }
+}
+
 struct Settings: Codable, Equatable {
     var hotkeyKeyCode: UInt64 = 59          // left control
     var completedOnboarding = false
@@ -23,6 +41,27 @@ struct Settings: Codable, Equatable {
     var launchAtLogin = true
     var theme: String = "system"            // system | light | dark
     var userName: String = ""               // for the greeting
+    var inputMode: InputMode = .holdAndSpeak
+    var removeFillers = true                // strip "uh", "um" from transcripts
+
+    enum CodingKeys: String, CodingKey {
+        case hotkeyKeyCode, completedOnboarding, showInHistory, launchAtLogin
+        case theme, userName, inputMode, removeFillers
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        hotkeyKeyCode = try c.decodeIfPresent(UInt64.self, forKey: .hotkeyKeyCode) ?? 59
+        completedOnboarding = try c.decodeIfPresent(Bool.self, forKey: .completedOnboarding) ?? false
+        showInHistory = try c.decodeIfPresent(Bool.self, forKey: .showInHistory) ?? true
+        launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? true
+        theme = try c.decodeIfPresent(String.self, forKey: .theme) ?? "system"
+        userName = try c.decodeIfPresent(String.self, forKey: .userName) ?? ""
+        inputMode = InputMode(rawValue: try c.decodeIfPresent(String.self, forKey: .inputMode) ?? "") ?? .holdAndSpeak
+        removeFillers = try c.decodeIfPresent(Bool.self, forKey: .removeFillers) ?? true
+    }
 }
 
 /// JSON-backed storage for settings and dictation history.
@@ -34,6 +73,9 @@ final class Store: ObservableObject {
 
     static let shared = Store()
 
+    @Published private(set) var noteSessions: [NoteSession] = []
+    private let notesURL: URL
+
     private let dir: URL
     private let settingsURL: URL
     private let historyURL: URL
@@ -44,6 +86,7 @@ final class Store: ObservableObject {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         settingsURL = dir.appendingPathComponent("settings.json")
         historyURL = dir.appendingPathComponent("history.json")
+        notesURL = dir.appendingPathComponent("notes.json")
         load()
     }
 
@@ -96,6 +139,19 @@ final class Store: ObservableObject {
         return streak
     }
 
+    /// Notes grouped by day, newest first.
+    var groupedNotes: [(id: Date, label: String, sessions: [NoteSession])] {
+        let cal = Calendar.current
+        let dict = Dictionary(grouping: noteSessions) { cal.startOfDay(for: $0.startedAt) }
+        return dict.keys.sorted(by: >).map { day in
+            let label: String
+            if cal.isDateInToday(day) { label = "Today" }
+            else if cal.isDateInYesterday(day) { label = "Yesterday" }
+            else { label = day.formatted(date: .long, time: .omitted) }
+            return (day, label, dict[day]!.sorted { $0.startedAt > $1.startedAt })
+        }
+    }
+
     /// History grouped by day, newest first. Labels: Today / Yesterday / date.
     var groupedEntries: [(id: Date, label: String, entries: [DictationEntry])] {
         let cal = Calendar.current
@@ -121,6 +177,29 @@ final class Store: ObservableObject {
         if let data = try? Data(contentsOf: historyURL),
            let e = try? JSONDecoder().decode([DictationEntry].self, from: data) {
             entries = e
+        }
+        if let data = try? Data(contentsOf: notesURL),
+           let n = try? JSONDecoder().decode([NoteSession].self, from: data) {
+            noteSessions = n
+        }
+    }
+
+    // MARK: Notes
+
+    func addNote(_ session: NoteSession) {
+        noteSessions.insert(session, at: 0)
+        if noteSessions.count > 500 { noteSessions.removeLast(noteSessions.count - 500) }
+        persistNotes()
+    }
+
+    func deleteNote(_ id: UUID) {
+        noteSessions.removeAll { $0.id == id }
+        persistNotes()
+    }
+
+    private func persistNotes() {
+        if let data = try? JSONEncoder().encode(noteSessions) {
+            try? data.write(to: notesURL, options: .atomic)
         }
     }
 

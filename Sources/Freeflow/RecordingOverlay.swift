@@ -6,6 +6,17 @@ import AppKit
 final class RecordingOverlay {
     private var panel: NSPanel?
 
+    func showStreaming(key: String) {
+        DispatchQueue.main.async { [self] in
+            if panel == nil { create() }
+            update {
+                $0.phase = .streaming
+                $0.keyLabel = key
+            }
+            panel?.orderFrontRegardless()
+        }
+    }
+
     func show(listening: Bool, key: String? = nil) {
         DispatchQueue.main.async { [self] in
             if panel == nil { create() }
@@ -66,7 +77,7 @@ final class RecordingOverlay {
 
 /// The pill itself.
 struct OverlayView: View {
-    enum Phase { case listening, transcribing }
+    enum Phase { case listening, transcribing, streaming }
     var phase: OverlayView.Phase = .listening
     var keyLabel: String = ""
     // Plain var (NOT @State): we drive it from outside via rootView updates.
@@ -106,6 +117,26 @@ struct OverlayView: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .fixedSize()
+            case .streaming:
+                Image(systemName: "waveform")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                LevelBars(level: micLevel)
+                    .frame(width: 46)
+                Text("Freeflow")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .fixedSize()
+                if !keyLabel.isEmpty {
+                    Text(keyLabel)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Brand.accent)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Capsule().fill(.white.opacity(0.92)))
+                        .lineLimit(1)
+                        .fixedSize()
+                }
             }
         }
         .padding(.horizontal, 22)

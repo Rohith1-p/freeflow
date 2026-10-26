@@ -38,6 +38,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 appearanceCard
                 permissionsCard
+                inputModeCard
                 hotkeyCard
                 startupCard
                 modelCard
@@ -214,6 +215,41 @@ struct SettingsView: View {
     private func openAccessibilitySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: - Input mode
+
+    private var inputModeCard: some View {
+        sectionCard(icon: "dot.radiowaves.left.and.right", title: "Input mode",
+                    subtitle: "How you trigger dictation.") {
+            Picker("", selection: Binding(
+                get: { store.settings.inputMode },
+                set: { newMode in
+                    store.settings.inputMode = newMode
+                    if newMode == .holdAndSpeak && state.isStreaming {
+                        state.stopFreeflowSpeech()   // switching away stops the stream
+                    }
+                })) {
+                ForEach(InputMode.allCases) { mode in
+                    Text(mode.label).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .tint(Brand.accent)
+
+            Text(store.settings.inputMode.caption)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+
+            hairline
+            Toggle("Remove filler words (um, uh)", isOn: $store.settings.removeFillers)
+                .font(.system(size: 13, weight: .medium))
+                .tint(Brand.accent)
+            Text("Applies to both modes. Filler words are stripped before text is pasted.")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
         }
     }
 
